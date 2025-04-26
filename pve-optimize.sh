@@ -1,7 +1,7 @@
 #!/bin/bash
 # Proxmox VE 初期優化腳本
 # 功能：安裝Python，停用 enterprise/pve-enterprise 訂閱源，加入 no-subscription，更新升級系統，詢問是否重開機
-# Author: ChatGPT x DevSecOps Style
+# Author:
 # Date: 2025-04-26
 
 set -e  # 有錯誤立即停止
