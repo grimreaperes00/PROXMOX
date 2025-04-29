@@ -10,7 +10,7 @@ echo "========================================="
 base_url="https://cdimage.kali.org/"
 echo "[INFO] 從 Kali 官方 cdimage.kali.org 抓取最新正式版目錄..."
 
-kali_url="${base_url}${kali_version}/kali-linux-${kali_version}-qemu-amd64.7z"
+latest_dir=$(curl -sf "$base_url" | grep -oP 'kali-\d+\.\d+[a-z]?/' | sort -rV | head -n 1)
 
 if [ -z "$latest_dir" ]; then
     echo "[ERROR] 找不到 Kali 版本目錄，請檢查網路或官方站。"
