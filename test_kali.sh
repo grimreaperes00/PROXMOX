@@ -8,23 +8,28 @@ echo "========================================="
 
 # 正確來源
 base_url="https://cdimage.kali.org/"
-echo "[INFO] 從 Kali 官方 cdimage.kali.org 抓取最新正式版目錄..."
+echo "[INFO] 取得 Kali 官方目錄列表 ..."
 
+# 找最新目錄（例如 kali-2025.1c/）
 latest_dir=$(curl -sf "$base_url" | grep -oP 'kali-\d+\.\d+[a-z]?/' | sort -rV | head -n 1)
 
 if [ -z "$latest_dir" ]; then
-    echo "[ERROR] 找不到 Kali 版本目錄，請檢查網路或官方站。"
+    echo "[ERROR] 找不到 Kali 最新版目錄，請檢查網路或官方站。"
     exit 1
 fi
 
-kali_version_dir="${latest_dir%/}"     # 拿掉最後一個斜線
-kali_version="${kali_version_dir#kali-}"  # 拿掉前面的 "kali-"
+# 目錄與純版本號拆開
+kali_version_dir="${latest_dir%/}"      # 去掉結尾的 "/"
+kali_version="${kali_version_dir#kali-}" # 去掉開頭的 "kali-"
 
-kali_url="${base_url}${kali_version_dir}/kali-linux-qemu-amd64.7z"
+# 正確組出檔案連結
+kali_url="${base_url}${kali_version_dir}/kali-linux-${kali_version}-qemu-amd64.7z"
 filename="kali-linux-${kali_version}-qemu-amd64.7z"
 
-echo "[INFO] 最新 Kali 資料夾：$kali_version_dir"
-echo "[INFO] 最新 Kali 映像下載連結：$kali_url"
+# 顯示資訊
+echo "[INFO] 最新目錄：$kali_version_dir"
+echo "[INFO] 下載檔案：$filename"
+echo "[INFO] 完整下載連結：$kali_url"
 
 # 儲存與工作資料夾
 storage_base="/var/lib/vz/template/iso/kali-images"
