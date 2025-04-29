@@ -6,7 +6,7 @@ echo "========================================="
 echo "[0/10] 初始化環境變數與 VM ID ..."
 echo "========================================="
 
-# 從 Kali 官方 cdimage.kali.org 取得最新正式版（含 a、b、c排序）
+# 正確來源
 base_url="https://cdimage.kali.org/"
 echo "[INFO] 從 Kali 官方 cdimage.kali.org 抓取最新正式版目錄..."
 
