@@ -6,14 +6,19 @@ echo "========================================="
 echo "[0/9] 初始化環境變數 ..."
 echo "========================================="
 
-# 自動偵測 Kali 最新版
-base_url="https://cdimage.kali.org"
-latest_url=$(curl -s "$base_url" | grep -oP 'href="kali-\d+\.\d+[a-z]*/' | sort -V | tail -n 1 | cut -d'"' -f2)
-kali_version="${latest_url//\//}"
-kali_url="${base_url}/${kali_version}/${kali_version}-qemu-amd64.7z"
-filename="$(basename "$kali_url")"
+# 從 Kali 官方網站動態抓取最新版 QEMU 映像
+echo "[INFO] 從 Kali 官網取得最新 QEMU 下載連結..."
+kali_url=$(curl -s https://www.kali.org/get-kali/#kali-virtual-machines | grep -oP 'https:\/\/.*?kali-qemu-.*?\.7z' | head -n 1)
 
-# 儲存與工作目錄
+if [ -z "$kali_url" ]; then
+    echo "[ERROR] 無法取得 Kali QEMU 最新版下載連結，請檢查網路或官方頁面結構是否變更。"
+    exit 1
+fi
+
+filename="$(basename "$kali_url")"
+echo "[INFO] 最新版 Kali QEMU 映像檔：$filename"
+
+# 儲存與工作資料夾
 storage_base="/var/lib/vz/template/iso/kali-images"
 mkdir -p "$storage_base"
 working_dir="$storage_base"
@@ -36,8 +41,8 @@ echo "========================================="
 echo "[1/9] 檢查 VM ID 是否已存在 ..."
 echo "========================================="
 if qm status "$vm_id" &>/dev/null; then
-  echo "VM ID $vm_id 已存在，請選一個未使用的 ID。"
-  exit 1
+    echo "VM ID $vm_id 已存在，請選一個未使用的 ID。"
+    exit 1
 fi
 echo "VM ID 可使用。"
 
@@ -53,11 +58,11 @@ echo "[3/9] 檢查是否已有 Kali 映像檔 ..."
 echo "========================================="
 cd "$working_dir"
 if [ -f "$filename" ]; then
-  echo "已存在 ${filename}，跳過下載。"
+    echo "映像檔已存在，跳過下載。"
 else
-  echo "開始下載 Kali 映像檔 ..."
-  wget -c --show-progress "$kali_url"
-  echo "下載完成。"
+    echo "開始下載 Kali 映像檔 ..."
+    wget -c --show-progress "$kali_url"
+    echo "下載完成。"
 fi
 
 echo "========================================="
@@ -66,11 +71,11 @@ echo "========================================="
 unar -f "$filename"
 echo "解壓縮完成。"
 
-# 找出 qcow2 檔案
+# 使用 find 避免引數過長
 qcow2file="$(find "$working_dir" -type f -name '*.qcow2' | head -n 1)"
 if [ -z "$qcow2file" ]; then
-  echo "找不到 qcow2 磁碟映像。"
-  exit 1
+    echo "找不到 qcow2 磁碟映像。"
+    exit 1
 fi
 echo "找到磁碟檔案：$qcow2file"
 
@@ -78,9 +83,9 @@ echo "========================================="
 echo "[5/9] 建立 Kali VM ..."
 echo "========================================="
 if [ -z "$vlan_id" ]; then
-  net_config="model=virtio,firewall=0,bridge=${network_bridge}"
+    net_config="model=virtio,firewall=0,bridge=${network_bridge}"
 else
-  net_config="model=virtio,firewall=0,bridge=${network_bridge},tag=${vlan_id}"
+    net_config="model=virtio,firewall=0,bridge=${network_bridge},tag=${vlan_id}"
 fi
 
 qm create "$vm_id" \
