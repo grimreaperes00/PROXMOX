@@ -42,14 +42,15 @@ working_dir="$storage_base"
 
 # ==========================
 echo "========================================="
-echo "[1/11] 自動清除舊版 Kali images ..."
+echo "[1/11] 比對是否已有最新 Kali 映像 ..."
 echo "========================================="
-if [ -d "$working_dir" ]; then
-  echo "[INFO] 清除 $working_dir 內所有檔案..."
-  rm -rf "${working_dir:?}/"*
-  echo "[SUCCESS] 舊版 Kali 映像已清空。"
+if [ -f "$existing_file" ]; then
+  echo "[SKIP] 已存在最新版映像：$filename"
+  skip_download=true
 else
-  echo "[INFO] 沒有既有映像需要清除。"
+  echo "[INFO] 舊映像或不存在，清除 $working_dir ..."
+  rm -rf "${working_dir:?}/"*
+  skip_download=false
 fi
 
 # ==========================
@@ -73,6 +74,7 @@ os_type="l26"
 storage_target="local-lvm"
 network_bridge="vmbr0"
 vlan_id=""
+disk_expand_size="+20G"
 
 # ==========================
 echo "========================================="
@@ -132,7 +134,9 @@ echo "========================================="
 echo "[8/11] 匯入 Kali 磁碟到 Storage ..."
 echo "========================================="
 qm importdisk "$vm_id" "$qcow2file" "$storage_target" --format qcow2
-echo "[SUCCESS] 磁碟匯入完成。"
+qm set "$vm_id" --scsi0 "${storage_target}:vm-${vm_id}-disk-0"
+qm resize "$vm_id" scsi0 "$disk_expand_size"
+echo "[OK] 磁碟匯入與擴充完成（$disk_expand_size）""
 
 # ==========================
 echo "========================================="
