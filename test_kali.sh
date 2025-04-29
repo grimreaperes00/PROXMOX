@@ -2,34 +2,36 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# 確認以 root 身份執行
+if [ "$(id -u)" -ne 0 ]; then
+  echo "[ERROR] 請使用 root 權限執行此腳本！"
+  exit 1
+fi
+
 echo "========================================="
 echo "[0/10] 初始化環境變數與 VM ID ..."
 echo "========================================="
 
-# 正確來源
+# 從 Kali 官方 cdimage.kali.org 取得最新正式版（包含字母排序）
 base_url="https://cdimage.kali.org/"
-echo "[INFO] 取得 Kali 官方目錄列表 ..."
+echo "[INFO] 從 Kali 官方 cdimage.kali.org 抓取最新正式版目錄..."
 
-# 找最新目錄（例如 kali-2025.1c/）
 latest_dir=$(curl -sf "$base_url" | grep -oP 'kali-\d+\.\d+[a-z]?/' | sort -rV | head -n 1)
 
 if [ -z "$latest_dir" ]; then
-    echo "[ERROR] 找不到 Kali 最新版目錄，請檢查網路或官方站。"
-    exit 1
+  echo "[ERROR] 找不到 Kali 版本目錄，請檢查網路或官方站。"
+  exit 1
 fi
 
-# 目錄與純版本號拆開
-kali_version_dir="${latest_dir%/}"      # 去掉結尾的 "/"
-kali_version="${kali_version_dir#kali-}" # 去掉開頭的 "kali-"
+kali_version_dir="${latest_dir%/}"       # 例如 kali-2025.1c
+kali_version="${kali_version_dir#kali-}"  # 例如 2025.1c
 
-# 正確組出檔案連結
-kali_url="${base_url}${kali_version_dir}/kali-linux-${kali_version}-qemu-amd64.7z"
 filename="kali-linux-${kali_version}-qemu-amd64.7z"
+kali_url="${base_url}${kali_version_dir}/${filename}"
 
-# 顯示資訊
-echo "[INFO] 最新目錄：$kali_version_dir"
-echo "[INFO] 下載檔案：$filename"
-echo "[INFO] 完整下載連結：$kali_url"
+echo "[INFO] 最新 Kali 資料夾：$kali_version_dir"
+echo "[INFO] 最新 Kali 下載檔案：$filename"
+echo "[INFO] 最新 Kali 下載連結：$kali_url"
 
 # 儲存與工作資料夾
 storage_base="/var/lib/vz/template/iso/kali-images"
@@ -39,10 +41,10 @@ working_dir="$storage_base"
 # 自動尋找可用的 VM ID (從 136 開始)
 start_id=136
 while qm status "$start_id" &>/dev/null; do
-    ((start_id++))
+  ((start_id++))
 done
 vm_id=$start_id
-echo "[INFO] 使用的空閒 VM ID：$vm_id"
+echo "[INFO] 自動使用空閒 VM ID：$vm_id"
 
 # VM 基本設定
 vm_name="kali-vm"
@@ -69,11 +71,11 @@ echo "[2/10] 檢查是否已有 Kali 映像檔 ..."
 echo "========================================="
 cd "$working_dir"
 if [ -f "$filename" ]; then
-    echo "映像檔已存在，跳過下載。"
+  echo "映像檔已存在，跳過下載。"
 else
-    echo "開始下載 Kali QEMU 映像檔 ..."
-    wget -c --show-progress "$kali_url"
-    echo "下載完成。"
+  echo "開始下載 Kali QEMU 映像檔 ..."
+  wget -c --retry-connrefused --tries=5 --show-progress "$kali_url"
+  echo "下載完成。"
 fi
 
 echo "========================================="
@@ -87,8 +89,8 @@ echo "[4/10] 搜尋解壓後 qcow2 檔案 ..."
 echo "========================================="
 qcow2file="$(find "$working_dir" -type f -name '*.qcow2' | head -n 1)"
 if [ -z "$qcow2file" ]; then
-    echo "[ERROR] 找不到 qcow2 磁碟映像。"
-    exit 1
+  echo "[ERROR] 找不到 qcow2 磁碟映像！"
+  exit 1
 fi
 echo "找到磁碟檔案：$qcow2file"
 
@@ -96,9 +98,9 @@ echo "========================================="
 echo "[5/10] 建立 Kali VM ..."
 echo "========================================="
 if [ -z "$vlan_id" ]; then
-    net_config="model=virtio,firewall=0,bridge=${network_bridge}"
+  net_config="model=virtio,firewall=0,bridge=${network_bridge}"
 else
-    net_config="model=virtio,firewall=0,bridge=${network_bridge},tag=${vlan_id}"
+  net_config="model=virtio,firewall=0,bridge=${network_bridge},tag=${vlan_id}"
 fi
 
 qm create "$vm_id" \
@@ -106,7 +108,8 @@ qm create "$vm_id" \
   --cores "$cpu_cores" --name "$vm_name" \
   --description "$vm_description" --net0 "$net_config" \
   --ostype "$os_type" --autostart 1 \
-  --startup order=10,up=30,down=30
+  --startup order=10,up=30,down=30 \
+  --machine q35
 echo "VM 建立完成。"
 
 echo "========================================="
@@ -136,4 +139,4 @@ echo "========================================="
 echo "[10/10] 確認 VM 狀態並結束作業 ..."
 echo "========================================="
 qm status "$vm_id"
-echo "作業全部完成！請透過 Proxmox GUI 或 CLI 進行後續操作。"
+echo "作業全部完成！請透過 Proxmox GUI 或 CLI 查看 Kali VM。"
