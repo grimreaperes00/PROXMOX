@@ -17,14 +17,14 @@ if [ -z "$latest_dir" ]; then
     exit 1
 fi
 
-kali_version_dir="${latest_dir%/}"     # 保留目錄用
-kali_version="${kali_version_dir#kali-}"  # 去掉前綴 "kali-"
+kali_version_dir="${latest_dir%/}"     # 拿掉最後一個斜線
+kali_version="${kali_version_dir#kali-}"  # 拿掉前面的 "kali-"
 
 kali_url="${base_url}${kali_version_dir}/kali-linux-${kali_version}-qemu-amd64.7z"
 filename="kali-linux-${kali_version}-qemu-amd64.7z"
 
-echo "[INFO] 解析得到 Kali 最新版目錄：$kali_version_dir"
-echo "[INFO] 預備下載連結：$kali_url"
+echo "[INFO] 最新 Kali 資料夾：$kali_version_dir"
+echo "[INFO] 最新 Kali 映像下載連結：$kali_url"
 
 # 儲存與工作資料夾
 storage_base="/var/lib/vz/template/iso/kali-images"
