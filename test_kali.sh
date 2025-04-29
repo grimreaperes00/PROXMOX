@@ -3,10 +3,10 @@ set -euo pipefail
 IFS=$'\n\t'
 
 echo "========================================="
-echo "[0/9] 初始化環境變數 ..."
+echo "[0/10] 初始化環境變數與 VM ID ..."
 echo "========================================="
 
-# 從 Kali 官方 cdimage.kali.org 取得最新正式版（含a、b、c排序）
+# 從 Kali 官方 cdimage.kali.org 取得最新正式版（含 a、b、c排序）
 base_url="https://cdimage.kali.org/"
 echo "[INFO] 從 Kali 官方 cdimage.kali.org 抓取最新正式版目錄..."
 
@@ -29,8 +29,15 @@ storage_base="/var/lib/vz/template/iso/kali-images"
 mkdir -p "$storage_base"
 working_dir="$storage_base"
 
+# 自動尋找可用的 VM ID (從 136 開始)
+start_id=136
+while qm status "$start_id" &>/dev/null; do
+    ((start_id++))
+done
+vm_id=$start_id
+echo "[INFO] 使用的空閒 VM ID：$vm_id"
+
 # VM 基本設定
-vm_id=136
 vm_name="kali-vm"
 vm_description="Kali VM imported automatically"
 min_memory=4096
@@ -44,23 +51,14 @@ vlan_id="666"
 echo "變數初始化完成。"
 
 echo "========================================="
-echo "[1/9] 檢查 VM ID 是否已存在 ..."
-echo "========================================="
-if qm status "$vm_id" &>/dev/null; then
-    echo "VM ID $vm_id 已存在，請選一個未使用的 ID。"
-    exit 1
-fi
-echo "VM ID 可使用。"
-
-echo "========================================="
-echo "[2/9] 確認並安裝必要套件 ..."
+echo "[1/10] 確認並安裝必要套件 ..."
 echo "========================================="
 apt-get update -y
 apt-get install -y unar wget curl
 echo "必要套件已安裝。"
 
 echo "========================================="
-echo "[3/9] 檢查是否已有 Kali 映像檔 ..."
+echo "[2/10] 檢查是否已有 Kali 映像檔 ..."
 echo "========================================="
 cd "$working_dir"
 if [ -f "$filename" ]; then
@@ -72,26 +70,28 @@ else
 fi
 
 echo "========================================="
-echo "[4/9] 解壓縮 Kali 映像檔 ..."
+echo "[3/10] 解壓縮 Kali 映像檔 ..."
 echo "========================================="
 unar -f "$filename"
 echo "解壓縮完成。"
 
-# 使用 find 避免引數過長
+echo "========================================="
+echo "[4/10] 搜尋解壓後 qcow2 檔案 ..."
+echo "========================================="
 qcow2file="$(find "$working_dir" -type f -name '*.qcow2' | head -n 1)"
 if [ -z "$qcow2file" ]; then
-    echo "找不到 qcow2 磁碟映像。"
+    echo "[ERROR] 找不到 qcow2 磁碟映像。"
     exit 1
 fi
 echo "找到磁碟檔案：$qcow2file"
 
 echo "========================================="
-echo "[5/9] 建立 Kali VM ..."
+echo "[5/10] 建立 Kali VM ..."
 echo "========================================="
 if [ -z "$vlan_id" ]; then
-  net_config="model=virtio,firewall=0,bridge=${network_bridge}"
+    net_config="model=virtio,firewall=0,bridge=${network_bridge}"
 else
-  net_config="model=virtio,firewall=0,bridge=${network_bridge},tag=${vlan_id}"
+    net_config="model=virtio,firewall=0,bridge=${network_bridge},tag=${vlan_id}"
 fi
 
 qm create "$vm_id" \
@@ -103,24 +103,30 @@ qm create "$vm_id" \
 echo "VM 建立完成。"
 
 echo "========================================="
-echo "[6/9] 匯入 Kali 磁碟到 Storage ..."
+echo "[6/10] 匯入 Kali 磁碟到 Storage ..."
 echo "========================================="
 qm importdisk "$vm_id" "$qcow2file" "$storage_target" --format qcow2
 echo "磁碟匯入完成。"
 
 echo "========================================="
-echo "[7/9] 掛載磁碟並設定開機順序 ..."
+echo "[7/10] 掛載磁碟並設定開機順序 ..."
 echo "========================================="
 qm set "$vm_id" --scsi0 "${storage_target}:vm-${vm_id}-disk-0"
 qm set "$vm_id" --boot order=scsi0 --bootdisk scsi0
 echo "磁碟掛載與開機設定完成。"
 
 echo "========================================="
-echo "[8/9] 啟動 Kali VM ..."
+echo "[8/10] 啟動 Kali VM ..."
 echo "========================================="
 qm start "$vm_id"
-echo "Kali VM 已成功啟動。"
+echo "Kali VM (${vm_id}) 已成功啟動。"
 
 echo "========================================="
-echo "[9/9] 作業完成，映像儲存於：$working_dir"
+echo "[9/10] 作業完成，映像儲存於：$working_dir"
 echo "========================================="
+
+echo "========================================="
+echo "[10/10] 確認 VM 狀態並結束作業 ..."
+echo "========================================="
+qm status "$vm_id"
+echo "作業全部完成！請透過 Proxmox GUI 或 CLI 進行後續操作。"
