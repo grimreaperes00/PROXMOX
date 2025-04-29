@@ -30,27 +30,28 @@ kali_version="${kali_version_dir#kali-}"  # 例如 2025.1c
 
 filename="kali-linux-${kali_version}-qemu-amd64.7z"
 kali_url="${base_url}${kali_version_dir}/${filename}"
+existing_file="$working_dir/$filename"
 
-echo "[INFO] 最新 Kali 資料夾：$kali_version_dir"
-echo "[INFO] 最新 Kali 檔案：$filename"
-echo "[INFO] 下載連結：$kali_url"
-
-# 儲存與工作資料夾
-storage_base="/var/lib/vz/template/iso/kali-images"
-mkdir -p "$storage_base"
-working_dir="$storage_base"
-
-# ==========================
 echo "========================================="
-echo "[1/11] 比對是否已有最新 Kali 映像 ..."
+echo "[比對] 是否已有最新版 Kali 映像檔 ..."
 echo "========================================="
+
 if [ -f "$existing_file" ]; then
-  echo "[SKIP] 已存在最新版映像：$filename"
+  echo "[SKIP] 已存在最新版映像檔：$existing_file"
   skip_download=true
 else
-  echo "[INFO] 舊映像或不存在，清除 $working_dir ..."
+  echo "[INFO] 舊映像不存在或非最新版，清除資料夾：$working_dir"
   rm -rf "${working_dir:?}/"*
   skip_download=false
+fi
+
+# 下載區段
+if [ "$skip_download" = false ]; then
+  echo "[INFO] 開始下載 Kali 映像檔 ..."
+  wget -c --retry-connrefused --tries=5 --show-progress "$kali_url"
+  echo "[OK] 下載完成。"
+else
+  echo "[INFO] 跳過下載。"
 fi
 
 # ==========================
