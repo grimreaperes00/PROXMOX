@@ -6,17 +6,23 @@ echo "========================================="
 echo "[0/9] 初始化環境變數 ..."
 echo "========================================="
 
-# 從 Kali 官方網站動態抓取最新版 QEMU 映像
-echo "[INFO] 從 Kali 官網取得最新 QEMU 下載連結..."
-kali_url=$(curl -s https://www.kali.org/get-kali/#kali-virtual-machines | grep -oP 'https:\/\/.*?kali-qemu-.*?\.7z' | head -n 1)
+# 從 Kali 官方 cdimage.kali.org 取得最新正式版（含a、b、c排序）
+base_url="https://cdimage.kali.org/"
+echo "[INFO] 從 Kali 官方 cdimage.kali.org 抓取最新正式版目錄..."
 
-if [ -z "$kali_url" ]; then
-    echo "[ERROR] 無法取得 Kali QEMU 最新版下載連結，請檢查網路或官方頁面結構是否變更。"
+latest_dir=$(curl -s "$base_url" | grep -oP 'kali-\d+\.\d+[a-z]?/' | sort -rV | head -n 1)
+
+if [ -z "$latest_dir" ]; then
+    echo "[ERROR] 找不到 Kali 版本目錄，請檢查網路或官方站。"
     exit 1
 fi
 
-filename="$(basename "$kali_url")"
-echo "[INFO] 最新版 Kali QEMU 映像檔：$filename"
+kali_version="${latest_dir%/}" # 去除最後的 /
+kali_url="${base_url}${kali_version}/${kali_version}-qemu-amd64.7z"
+filename="${kali_version}-qemu-amd64.7z"
+
+echo "[INFO] 解析得到 Kali 最新版：$kali_version"
+echo "[INFO] 預備下載連結：$kali_url"
 
 # 儲存與工作資料夾
 storage_base="/var/lib/vz/template/iso/kali-images"
@@ -60,7 +66,7 @@ cd "$working_dir"
 if [ -f "$filename" ]; then
     echo "映像檔已存在，跳過下載。"
 else
-    echo "開始下載 Kali 映像檔 ..."
+    echo "開始下載 Kali QEMU 映像檔 ..."
     wget -c --show-progress "$kali_url"
     echo "下載完成。"
 fi
@@ -83,9 +89,9 @@ echo "========================================="
 echo "[5/9] 建立 Kali VM ..."
 echo "========================================="
 if [ -z "$vlan_id" ]; then
-    net_config="model=virtio,firewall=0,bridge=${network_bridge}"
+  net_config="model=virtio,firewall=0,bridge=${network_bridge}"
 else
-    net_config="model=virtio,firewall=0,bridge=${network_bridge},tag=${vlan_id}"
+  net_config="model=virtio,firewall=0,bridge=${network_bridge},tag=${vlan_id}"
 fi
 
 qm create "$vm_id" \
