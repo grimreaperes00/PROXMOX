@@ -8,9 +8,9 @@ echo "========================================="
 
 # Kali 最新版偵測與正確拼接 URL
 base_url="https://cdimage.kali.org"
-latest_url=$(curl -s "$base_url" | grep -oP 'href="kali-\d+\.\d+/' | sort -V | tail -n 1 | cut -d'"' -f2)
-kali_folder="${latest_url//\//}"           # 例如 kali-2024.4
-kali_version="${kali_folder#kali-}"         # 去除 kali-，只留 2024.4
+latest_url=$(curl -s "$base_url" | grep -oP 'href="kali-\d+\.\d+[a-z]?/' | sort -V | tail -n 1 | cut -d'"' -f2)
+kali_folder="${latest_url//\//}"           # 例如 kali-2025.1c
+kali_version="${kali_folder#kali-}"         # 取得 2025.1c
 filename="kali-linux-${kali_version}-qemu-amd64.7z"
 kali_url="${base_url}/${kali_folder}/${filename}"
 
