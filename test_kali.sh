@@ -71,8 +71,8 @@ max_memory=8192
 cpu_cores=4
 os_type="l26"
 storage_target="local-lvm"
-network_bridge="vmbr1"
-vlan_id="666"
+network_bridge="vmbr0"
+vlan_id=""
 
 # ==========================
 echo "========================================="
