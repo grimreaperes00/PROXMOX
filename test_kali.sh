@@ -9,9 +9,10 @@ echo "========================================="
 # Kali 最新版偵測
 base_url="https://cdimage.kali.org"
 latest_url=$(curl -s "$base_url" | grep -oP 'href="kali-\d+\.\d+/' | sort -V | tail -n 1 | cut -d'"' -f2)
-kali_version="${latest_url//\//}"
-kali_url="${base_url}/${kali_version}/${kali_version}-qemu-amd64.7z"
-filename="$(basename "$kali_url")"
+kali_folder="${latest_url//\//}"  # kali-2024.4
+kali_version="${kali_folder#kali-}" # 只取 2024.4
+filename="kali-linux-${kali_version}-qemu-amd64.7z"
+kali_url="${base_url}/${kali_folder}/${filename}"
 
 # 儲存與工作區
 storage_base="/var/lib/vz/template/iso/kali-images"
