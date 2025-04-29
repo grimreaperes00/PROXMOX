@@ -6,22 +6,22 @@ echo "========================================="
 echo "[0/9] 初始化環境變數 ..."
 echo "========================================="
 
-# Kali 最新版偵測
+# 自動偵測 Kali 最新版
 base_url="https://cdimage.kali.org"
-latest_url=$(curl -s "$base_url" | grep -oP 'href="kali-\d+\.\d+/' | sort -V | tail -n 1 | cut -d'"' -f2)
+latest_url=$(curl -s "$base_url" | grep -oP 'href="kali-\d+\.\d+[a-z]*/' | sort -V | tail -n 1 | cut -d'"' -f2)
 kali_version="${latest_url//\//}"
 kali_url="${base_url}/${kali_version}/${kali_version}-qemu-amd64.7z"
 filename="$(basename "$kali_url")"
 
-# 儲存與工作區（避免使用 /tmp）
+# 儲存與工作目錄
 storage_base="/var/lib/vz/template/iso/kali-images"
 mkdir -p "$storage_base"
 working_dir="$storage_base"
 
-# VM 設定
+# VM 基本設定
 vm_id=136
 vm_name="kali-vm"
-vm_description="Kali VM imported from OffSec"
+vm_description="Kali VM imported automatically"
 min_memory=4096
 max_memory=8192
 cpu_cores=4
@@ -36,7 +36,7 @@ echo "========================================="
 echo "[1/9] 檢查 VM ID 是否已存在 ..."
 echo "========================================="
 if qm status "$vm_id" &>/dev/null; then
-  echo "VM ID $vm_id 已存在，請換一個 ID。"
+  echo "VM ID $vm_id 已存在，請選一個未使用的 ID。"
   exit 1
 fi
 echo "VM ID 可使用。"
@@ -53,9 +53,9 @@ echo "[3/9] 檢查是否已有 Kali 映像檔 ..."
 echo "========================================="
 cd "$working_dir"
 if [ -f "$filename" ]; then
-  echo "映像檔已存在，跳過下載。"
+  echo "已存在 ${filename}，跳過下載。"
 else
-  echo "下載 Kali VM 映像檔 ..."
+  echo "開始下載 Kali 映像檔 ..."
   wget -c --show-progress "$kali_url"
   echo "下載完成。"
 fi
@@ -66,7 +66,7 @@ echo "========================================="
 unar -f "$filename"
 echo "解壓縮完成。"
 
-# 使用 find 避免引數過長錯誤
+# 找出 qcow2 檔案
 qcow2file="$(find "$working_dir" -type f -name '*.qcow2' | head -n 1)"
 if [ -z "$qcow2file" ]; then
   echo "找不到 qcow2 磁碟映像。"
@@ -111,5 +111,5 @@ qm start "$vm_id"
 echo "Kali VM 已成功啟動。"
 
 echo "========================================="
-echo "[9/9] 作業完成，Kali 映像保留於：$working_dir"
+echo "[9/9] 作業完成，映像儲存於：$working_dir"
 echo "========================================="
