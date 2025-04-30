@@ -157,3 +157,46 @@ echo " Kali VM 建立與啟動完成！"
 echo " 儲存資料夾：$working_dir"
 echo " 擴充磁碟：$disk_expand_size"
 echo "  VM ID：$vm_id"
+
+# Unit test for create_kali_vm function
+
+test_create_kali_vm() {
+  echo "[TEST] Testing create_kali_vm function..."
+
+  # Test parameters
+  local test_vm_id=999
+  local test_cpu_cores=2
+
+  # Mock qm command to avoid actual VM creation
+  qm() {
+    echo "[MOCK] qm $@"
+  }
+
+  # Mock apt-get to avoid actual package installation
+  apt-get() {
+    echo "[MOCK] apt-get $@"
+  }
+
+  # Mock wget to avoid actual file download
+  wget() {
+    echo "[MOCK] wget $@"
+  }
+
+  # Mock unar to avoid actual file extraction
+  unar() {
+    echo "[MOCK] unar $@"
+  }
+
+  # Mock curl to return a fake latest URL
+  curl() {
+    echo "href=\"kali-2025.1/\""
+  }
+
+  # Run the function
+  create_kali_vm "$test_vm_id" "$test_cpu_cores"
+
+  echo "[TEST] create_kali_vm test completed."
+}
+
+# Run the test
+test_create_kali_vm
