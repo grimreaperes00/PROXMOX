@@ -43,7 +43,7 @@ fi
 echo "========================================="
 echo "[2/11] 尋找可用 VM ID ..."
 echo "========================================="
-start_id=136
+start_id=999
 while qm status "$start_id" &>/dev/null; do
   ((start_id++))
 done
