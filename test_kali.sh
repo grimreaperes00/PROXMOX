@@ -62,7 +62,7 @@ os_type="l26"
 storage_target="local-lvm"
 network_bridge="vmbr0"
 vlan_id=""
-expand_gb=20
+expand_gb=0
 echo "[OK] 基本參數已設定"
 
 echo "========================================="
