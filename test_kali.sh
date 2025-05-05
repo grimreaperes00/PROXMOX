@@ -6,7 +6,6 @@ echo "========================================="
 echo "[0/11] 初始化環境變數與 VM ID ..."
 echo "========================================="
 
-# 取得 Kali 最新版資訊
 base_url="https://cdimage.kali.org/"
 latest_dir=$(curl -sf "$base_url" | grep -oP 'kali-\d+\.\d+[a-z]?/' | sort -rV | head -n 1)
 
@@ -20,7 +19,6 @@ kali_version="${kali_version_dir#kali-}"
 filename="kali-linux-${kali_version}-qemu-amd64.7z"
 kali_url="${base_url}${kali_version_dir}/${filename}"
 
-# 資料夾與檔案路徑
 working_dir="/var/lib/vz/template/iso/kali-images"
 mkdir -p "$working_dir"
 existing_file="$working_dir/$filename"
@@ -29,7 +27,6 @@ echo "[INFO] 最新 Kali 資料夾：$kali_version_dir"
 echo "[INFO] 最新 Kali 檔案：$filename"
 echo "[INFO] 下載連結：$kali_url"
 
-# =========================================
 echo "========================================="
 echo "[1/11] 比對是否已有最新 Kali 映像 ..."
 echo "========================================="
@@ -43,7 +40,6 @@ else
   skip_download=false
 fi
 
-# =========================================
 echo "========================================="
 echo "[2/11] 尋找可用 VM ID ..."
 echo "========================================="
@@ -54,7 +50,6 @@ done
 vm_id=$start_id
 echo "[INFO] 使用 VM ID：$vm_id"
 
-# VM 基本設定
 vm_name="kali-vm"
 vm_description="Kali VM imported automatically"
 min_memory=4096
@@ -64,9 +59,8 @@ os_type="l26"
 storage_target="local-lvm"
 network_bridge="vmbr0"
 vlan_id=""
-expand_mb=20480   # 擴充 20G
+expand_mb=20480
 
-# =========================================
 echo "========================================="
 echo "[3/11] 安裝必要套件 ..."
 echo "========================================="
@@ -74,7 +68,6 @@ apt-get update -y
 apt-get install -y unar wget curl
 echo "[OK] 必要套件已安裝"
 
-# =========================================
 echo "========================================="
 echo "[4/11] 下載 Kali QEMU 映像 ..."
 echo "========================================="
@@ -86,14 +79,12 @@ else
   echo "[INFO] 跳過下載"
 fi
 
-# =========================================
 echo "========================================="
 echo "[5/11] 解壓縮 Kali 映像 ..."
 echo "========================================="
 unar -f "$filename"
 echo "[OK] 解壓縮完成"
 
-# =========================================
 echo "========================================="
 echo "[6/11] 搜尋 .qcow2 磁碟映像 ..."
 echo "========================================="
@@ -104,7 +95,6 @@ if [ -z "$qcow2file" ]; then
 fi
 echo "[INFO] 找到映像檔：$qcow2file"
 
-# =========================================
 echo "========================================="
 echo "[7/11] 建立 Kali VM ..."
 echo "========================================="
@@ -123,14 +113,12 @@ qm create "$vm_id" \
   --machine q35
 echo "[OK] VM 建立完成"
 
-# =========================================
 echo "========================================="
 echo "[8/11] 匯入並擴充 Kali 磁碟 ..."
 echo "========================================="
 qm importdisk "$vm_id" "$qcow2file" "$storage_target" --format qcow2
 qm set "$vm_id" --scsi0 "${storage_target}:vm-${vm_id}-disk-0"
 
-# 檢查目前磁碟大小（從 scsi0 中解析）
 scsi_info=$(qm config "$vm_id" | grep -Po "scsi0:.*size=\K\d+")
 if [ -z "$scsi_info" ]; then
   echo "[WARN] 無法判斷現有磁碟大小，略過擴充"
@@ -142,28 +130,25 @@ else
   echo "[OK] 磁碟擴充完成"
 fi
 
-# =========================================
 echo "========================================="
 echo "[9/11] 設定開機順序 ..."
 echo "========================================="
 qm set "$vm_id" --boot order=scsi0 --bootdisk scsi0
 echo "[OK] 已設為開機磁碟"
 
-# =========================================
 echo "========================================="
-echo "[9.5/11] 關閉 KVM 硬體虛擬化 (無 GPU 主機適用) ..."
+echo "[9.5/11] 關閉 KVM 硬體虛擬化 (無硬體支援適用) ..."
 echo "========================================="
+# ⚠ 將 CPU 設為 host 並關閉 kvm（模擬模式，避開 BIOS 未開啟虛擬化錯誤）
 qm set "$vm_id" --cpu host,kvm=off
 echo "[OK] 已設定 CPU 模型為 host 並關閉 KVM 虛擬化"
 
-# =========================================
 echo "========================================="
 echo "[10/11] 啟動 Kali VM ..."
 echo "========================================="
 qm start "$vm_id"
 echo "[OK] VM 啟動成功"
 
-# =========================================
 echo "========================================="
 echo "[11/11] 顯示 VM 狀態 ..."
 echo "========================================="
