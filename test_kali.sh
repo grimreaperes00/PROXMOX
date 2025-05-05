@@ -64,7 +64,7 @@ os_type="l26"
 storage_target="local-lvm"
 network_bridge="vmbr0"
 vlan_id=""
-disk_expand_mb=20480   # 等同 20GB
+expand_mb=20480   # 擴充 20G
 
 # =========================================
 echo "========================================="
@@ -129,8 +129,18 @@ echo "[8/11] 匯入並擴充 Kali 磁碟 ..."
 echo "========================================="
 qm importdisk "$vm_id" "$qcow2file" "$storage_target" --format qcow2
 qm set "$vm_id" --scsi0 "${storage_target}:vm-${vm_id}-disk-0"
-qm resize "$vm_id" scsi0 "${disk_expand_mb}M"
-echo "[OK] 磁碟已擴充 ${disk_expand_mb}M"
+
+# 檢查目前磁碟大小（從 scsi0 中解析）
+scsi_info=$(qm config "$vm_id" | grep -Po "scsi0:.*size=\K\d+")
+if [ -z "$scsi_info" ]; then
+  echo "[WARN] 無法判斷現有磁碟大小，略過擴充"
+else
+  current_size=$scsi_info
+  new_size=$((current_size + expand_mb))
+  echo "[INFO] 擴充磁碟從 ${current_size}M 到 ${new_size}M"
+  qm resize "$vm_id" scsi0 "${new_size}M"
+  echo "[OK] 磁碟擴充完成"
+fi
 
 # =========================================
 echo "========================================="
@@ -162,5 +172,5 @@ qm status "$vm_id"
 echo ""
 echo " Kali VM 建立與啟動完成！"
 echo " 儲存資料夾：$working_dir"
-echo " 擴充磁碟：${disk_expand_mb}M"
+echo " 擴充磁碟：${expand_mb}M"
 echo "  VM ID：$vm_id"
