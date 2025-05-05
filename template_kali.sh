@@ -89,7 +89,7 @@ echo "[8/11] 建立 Kali Template VM ..."
 echo "========================================="
 qm create "$vm_id" \
   --name "kali-template" \
-  --ostype l26
+  --ostype 999
 echo "[OK] Template VM 建立完成"
 
 echo "========================================="
