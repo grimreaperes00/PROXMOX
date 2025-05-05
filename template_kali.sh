@@ -45,6 +45,7 @@ echo "[1.5/11] 偵測是否已有黃金映像 Template VM ..."
 echo "========================================="
 template_id=999
 clone_script="./kali_clone_vm.sh"
+prepare_script="./template_prepare.sh"
 
 if qm status "$template_id" &>/dev/null && qm config "$template_id" | grep -q "^template: 1"; then
   echo "[SKIP] 已存在黃金映像 VM（ID: $template_id）"
@@ -75,6 +76,7 @@ echo "[4/11] 安裝必要套件 ..."
 echo "========================================="
 apt-get update -y
 apt-get install -y unar wget curl
+
 echo "[OK] 必要套件已安裝"
 
 echo "========================================="
@@ -110,6 +112,7 @@ echo "========================================="
 qm create "$vm_id" \
   --name "kali-template" \
   --ostype l26
+
 echo "[OK] Template VM 建立完成"
 
 echo "========================================="
@@ -120,16 +123,12 @@ qm set "$vm_id" --scsi0 "local-lvm:vm-${vm_id}-disk-0"
 qm set "$vm_id" --boot order=scsi0
 
 echo "========================================="
-echo "[10.5/11] 將 VM 設為 Template ..."
+echo "[10/11] 跳轉清理腳本以準備轉為 Template ..."
 echo "========================================="
-qm template "$vm_id"
-echo "[OK] VM 已轉為黃金映像（template）"
-
-echo "[INFO] 儲存版本紀錄"
-echo "$kali_version" > "$working_dir/.kali_version"
-
-echo ""
-echo "========================================="
-echo " Kali Template 製作完成！"
-echo " 儲存資料夾：$working_dir"
-echo "  VM ID：$vm_id"
+if [ -x "$prepare_script" ]; then
+  echo "[INFO] 執行清理腳本：$prepare_script"
+  exec "$prepare_script" "$vm_id" "$@"
+else
+  echo "[ERROR] 找不到清理腳本或無執行權限：$prepare_script"
+  exit 1
+fi
