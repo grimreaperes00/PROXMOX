@@ -31,6 +31,10 @@ echo "========================================="
 echo "[1/11] 比對是否已有最新 Kali 映像 ..."
 echo "========================================="
 
+template_id=999
+clone_script="./kali_clone_vm.sh"
+prepare_script="./template_prepare.sh"
+
 if [ -f "$existing_file" ]; then
   echo "[SKIP] 已存在最新版映像：$existing_file"
   skip_download=true
@@ -38,14 +42,18 @@ else
   echo "[INFO] 映像不存在或為舊版本，清除資料夾：$working_dir"
   rm -rf "${working_dir:?}/"*
   skip_download=false
+
+  # 🧨 偵測並刪除舊的 template VM（若存在）
+  if qm status "$template_id" &>/dev/null; then
+    echo "[WARN] 偵測到舊版 Template VM（ID: $template_id），將移除以重建"
+    qm destroy "$template_id" --purge
+    echo "[OK] 舊 Template VM 已刪除"
+  fi
 fi
 
 echo "========================================="
 echo "[1.5/11] 偵測是否已有黃金映像 Template VM ..."
 echo "========================================="
-template_id=999
-clone_script="./kali_clone_vm.sh"
-prepare_script="./template_prepare.sh"
 
 if qm status "$template_id" &>/dev/null && qm config "$template_id" | grep -q "^template: 1"; then
   echo "[SKIP] 已存在黃金映像 VM（ID: $template_id）"
@@ -72,7 +80,6 @@ echo "[4/11] 安裝必要套件 ..."
 echo "========================================="
 apt-get update -y
 apt-get install -y unar wget curl
-
 echo "[OK] 必要套件已安裝"
 
 echo "========================================="
@@ -108,7 +115,6 @@ echo "========================================="
 qm create "$vm_id" \
   --name "kali-template" \
   --ostype l26
-
 echo "[OK] Template VM 建立完成"
 
 echo "========================================="
