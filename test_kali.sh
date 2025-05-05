@@ -131,17 +131,19 @@ else
 fi
 
 echo "========================================="
-echo "[9/11] 設定開機順序 ..."
+echo "[9/11] 設定開機順序與檢查 KVM 狀態 ... "
 echo "========================================="
+
 qm set "$vm_id" --boot order=scsi0 --bootdisk scsi0
 echo "[OK] 已設為開機磁碟"
 
-echo "========================================="
-echo "[9.5/11] 關閉 KVM 硬體虛擬化 (無硬體支援適用) ..."
-echo "========================================="
-# ⚠ 將 CPU 設為 host 並關閉 kvm（模擬模式，避開 BIOS 未開啟虛擬化錯誤）
-qm set "$vm_id" --kvm 0
-echo "[OK] 已設定 CPU 模型為 host 並關閉 KVM 虛擬化"
+if [ ! -e /dev/kvm ]; then
+  echo "[WARN] 檢測到系統未啟用 KVM，將關閉 VM 的 KVM 虛擬化..."
+  qm set "$vm_id" --kvm 0
+  echo "[OK] 已設定 CPU 模型為 host 並關閉 KVM 虛擬化"
+else
+  echo "[INFO] KVM 已啟用，將保持預設虛擬化設定"
+fi
 
 echo "========================================="
 echo "[10/11] 啟動 Kali VM ..."
