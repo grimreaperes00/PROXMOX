@@ -44,9 +44,18 @@ echo "========================================="
 echo "[1.5/11] 偵測是否已有黃金映像 Template VM ..."
 echo "========================================="
 template_id=999
+clone_script="./kali_clone_vm.sh"
+
 if qm status "$template_id" &>/dev/null && qm config "$template_id" | grep -q "^template: 1"; then
   echo "[SKIP] 已存在黃金映像 VM（ID: $template_id）"
-  exit 0
+  if [ -x "$clone_script" ]; then
+    echo "[INFO] 偵測到 clone 腳本，跳轉執行：$clone_script"
+    exec "$clone_script" "$@"
+  else
+    echo "[WARN] 找到 template，但未偵測到可執行的 clone 腳本：$clone_script"
+    echo "[提示] 請確認腳本名稱與執行權限正確（chmod +x）"
+    exit 1
+  fi
 else
   echo "[INFO] 尚未建立黃金映像 VM，將繼續建構流程..."
 fi
