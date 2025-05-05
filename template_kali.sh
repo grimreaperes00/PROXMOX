@@ -41,9 +41,20 @@ else
 fi
 
 echo "========================================="
+echo "[1.5/11] 偵測是否已有黃金映像 Template VM ..."
+echo "========================================="
+template_id=999
+if qm status "$template_id" &>/dev/null && qm config "$template_id" | grep -q "^template: 1"; then
+  echo "[SKIP] 已存在黃金映像 VM（ID: $template_id）"
+  exit 0
+else
+  echo "[INFO] 尚未建立黃金映像 VM，將繼續建構流程..."
+fi
+
+echo "========================================="
 echo "[2/11] 尋找可用 VM ID ..."
 echo "========================================="
-start_id=999
+start_id=$template_id
 while qm status "$start_id" &>/dev/null; do
   ((start_id++))
 done
@@ -104,6 +115,9 @@ echo "[10.5/11] 將 VM 設為 Template ..."
 echo "========================================="
 qm template "$vm_id"
 echo "[OK] VM 已轉為黃金映像（template）"
+
+echo "[INFO] 儲存版本紀錄"
+echo "$kali_version" > "$working_dir/.kali_version"
 
 echo ""
 echo "========================================="
