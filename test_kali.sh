@@ -50,6 +50,9 @@ done
 vm_id=$start_id
 echo "[INFO] 使用 VM ID：$vm_id"
 
+echo "========================================="
+echo "[3/11] 設定 VM 基礎配置 ..."
+echo "========================================="
 vm_name="kali-vm"
 vm_description="Kali VM imported automatically"
 min_memory=4096
@@ -59,17 +62,18 @@ os_type="l26"
 storage_target="local-lvm"
 network_bridge="vmbr0"
 vlan_id=""
-expand_mb=20480
+expand_gb=20
+echo "[OK] 基本參數已設定"
 
 echo "========================================="
-echo "[3/11] 安裝必要套件 ..."
+echo "[4/11] 安裝必要套件 ..."
 echo "========================================="
 apt-get update -y
 apt-get install -y unar wget curl
 echo "[OK] 必要套件已安裝"
 
 echo "========================================="
-echo "[4/11] 下載 Kali QEMU 映像 ..."
+echo "[5/11] 下載 Kali QEMU 映像 ..."
 echo "========================================="
 cd "$working_dir"
 if [ "$skip_download" = false ]; then
@@ -80,13 +84,13 @@ else
 fi
 
 echo "========================================="
-echo "[5/11] 解壓縮 Kali 映像 ..."
+echo "[6/11] 解壓縮 Kali 映像 ..."
 echo "========================================="
 unar -f "$filename"
 echo "[OK] 解壓縮完成"
 
 echo "========================================="
-echo "[6/11] 搜尋 .qcow2 磁碟映像 ..."
+echo "[7/11] 搜尋 .qcow2 磁碟映像 ..."
 echo "========================================="
 qcow2file="$(find "$working_dir" -type f -name '*.qcow2' | head -n 1)"
 if [ -z "$qcow2file" ]; then
@@ -96,7 +100,7 @@ fi
 echo "[INFO] 找到映像檔：$qcow2file"
 
 echo "========================================="
-echo "[7/11] 建立 Kali VM ..."
+echo "[8/11] 建立 Kali VM ..."
 echo "========================================="
 if [ -z "$vlan_id" ]; then
   net_config="model=virtio,firewall=0,bridge=${network_bridge}"
@@ -114,24 +118,25 @@ qm create "$vm_id" \
 echo "[OK] VM 建立完成"
 
 echo "========================================="
-echo "[8/11] 匯入並擴充 Kali 磁碟 ..."
+echo "[9/11] 匯入並擴充 Kali 磁碟 ..."
 echo "========================================="
 qm importdisk "$vm_id" "$qcow2file" "$storage_target" --format qcow2
 qm set "$vm_id" --scsi0 "${storage_target}:vm-${vm_id}-disk-0"
 
-scsi_info=$(qm config "$vm_id" | grep -Po "scsi0:.*size=\K\d+")
-if [ -z "$scsi_info" ]; then
-  echo "[WARN] 無法判斷現有磁碟大小，略過擴充"
+raw_size=$(qm config "$vm_id" | grep -Po 'scsi0:.*size=\K\d+(\.\d+)?(?=G)' || true)
+
+if [ -z "$raw_size" ]; then
+  echo "[WARN] 無法解析磁碟大小，略過擴充"
 else
-  current_size=$scsi_info
-  new_size=$((current_size + expand_mb))
-  echo "[INFO] 擴充磁碟從 ${current_size}M 到 ${new_size}M"
-  qm resize "$vm_id" scsi0 "${new_size}M"
-  echo "[OK] 磁碟擴充完成"
+  current_size_gb=$(printf "%.0f" "$raw_size")
+  new_size_gb=$((current_size_gb + expand_gb))
+  echo "[INFO] 當前磁碟大小：${current_size_gb}G，擴充後大小：${new_size_gb}G"
+  qm resize "$vm_id" scsi0 "${new_size_gb}G"
+  echo "[OK] 磁碟已擴充至 ${new_size_gb}G"
 fi
 
 echo "========================================="
-echo "[9/11] 設定開機順序與檢查 KVM 狀態 ... "
+echo "[10/11] 設定開機磁碟與檢查 KVM 狀態 ..."
 echo "========================================="
 
 qm set "$vm_id" --boot order=scsi0 --bootdisk scsi0
@@ -146,18 +151,14 @@ else
 fi
 
 echo "========================================="
-echo "[10/11] 啟動 Kali VM ..."
+echo "[11/11] 啟動 Kali VM ..."
 echo "========================================="
 qm start "$vm_id"
 echo "[OK] VM 啟動成功"
 
-echo "========================================="
-echo "[11/11] 顯示 VM 狀態 ..."
-echo "========================================="
-qm status "$vm_id"
-
 echo ""
+echo "========================================="
 echo " Kali VM 建立與啟動完成！"
 echo " 儲存資料夾：$working_dir"
-echo " 擴充磁碟：${expand_mb}M"
+echo " 擴充磁碟：+${expand_gb}G"
 echo "  VM ID：$vm_id"
