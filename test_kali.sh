@@ -23,7 +23,7 @@ kali_url="${base_url}${kali_version_dir}/${filename}"
 # 資料夾與檔案路徑
 working_dir="/var/lib/vz/template/iso/kali-images"
 mkdir -p "$working_dir"
-existing_file="$working_dir/$filename"   #  提早定義以防錯誤
+existing_file="$working_dir/$filename"
 
 echo "[INFO] 最新 Kali 資料夾：$kali_version_dir"
 echo "[INFO] 最新 Kali 檔案：$filename"
@@ -64,7 +64,7 @@ os_type="l26"
 storage_target="local-lvm"
 network_bridge="vmbr0"
 vlan_id=""
-disk_expand_size="+20G"
+disk_expand_mb=20480   # 等同 20GB
 
 # =========================================
 echo "========================================="
@@ -129,8 +129,8 @@ echo "[8/11] 匯入並擴充 Kali 磁碟 ..."
 echo "========================================="
 qm importdisk "$vm_id" "$qcow2file" "$storage_target" --format qcow2
 qm set "$vm_id" --scsi0 "${storage_target}:vm-${vm_id}-disk-0"
-qm resize "$vm_id" scsi0 "$disk_expand_size"
-echo "[OK] 磁碟匯入並擴充 $disk_expand_size"
+qm resize "$vm_id" scsi0 "${disk_expand_mb}M"
+echo "[OK] 磁碟已擴充 ${disk_expand_mb}M"
 
 # =========================================
 echo "========================================="
@@ -138,6 +138,13 @@ echo "[9/11] 設定開機順序 ..."
 echo "========================================="
 qm set "$vm_id" --boot order=scsi0 --bootdisk scsi0
 echo "[OK] 已設為開機磁碟"
+
+# =========================================
+echo "========================================="
+echo "[9.5/11] 關閉 KVM 硬體虛擬化 (無 GPU 主機適用) ..."
+echo "========================================="
+qm set "$vm_id" --cpu host,kvm=off
+echo "[OK] 已設定 CPU 模型為 host 並關閉 KVM 虛擬化"
 
 # =========================================
 echo "========================================="
@@ -155,5 +162,5 @@ qm status "$vm_id"
 echo ""
 echo " Kali VM 建立與啟動完成！"
 echo " 儲存資料夾：$working_dir"
-echo " 擴充磁碟：$disk_expand_size"
+echo " 擴充磁碟：${disk_expand_mb}M"
 echo "  VM ID：$vm_id"
