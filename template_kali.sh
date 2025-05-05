@@ -62,13 +62,9 @@ else
 fi
 
 echo "========================================="
-echo "[2/11] 尋找可用 VM ID ..."
+echo "[2/11] 使用固定 VM ID 建立黃金映像 ..."
 echo "========================================="
-start_id=$template_id
-while qm status "$start_id" &>/dev/null; do
-  ((start_id++))
-done
-vm_id=$start_id
+vm_id=$template_id
 echo "[INFO] 使用 VM ID：$vm_id"
 
 echo "========================================="
