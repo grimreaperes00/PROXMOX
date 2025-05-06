@@ -23,6 +23,10 @@ working_dir="/var/lib/vz/template/iso/kali-images"
 mkdir -p "$working_dir"
 existing_file="$working_dir/$filename"
 
+template_id=999
+clone_script="./kali_clone_vm.sh"
+prepare_script="./template_prepare.sh"
+
 echo "[INFO] 最新 Kali 資料夾：$kali_version_dir"
 echo "[INFO] 最新 Kali 檔案：$filename"
 echo "[INFO] 下載連結：$kali_url"
@@ -30,10 +34,6 @@ echo "[INFO] 下載連結：$kali_url"
 echo "========================================="
 echo "[1/11] 比對是否已有最新 Kali 映像 ..."
 echo "========================================="
-
-template_id=999
-clone_script="./kali_clone_vm.sh"
-prepare_script="./template_prepare.sh"
 
 if [ -f "$existing_file" ]; then
   echo "[SKIP] 已存在最新版映像：$existing_file"
@@ -43,7 +43,6 @@ else
   rm -rf "${working_dir:?}/"*
   skip_download=false
 
-  # 🧨 偵測並刪除舊的 template VM（若存在）
   if qm status "$template_id" &>/dev/null; then
     echo "[WARN] 偵測到舊版 Template VM（ID: $template_id），將移除以重建"
     qm destroy "$template_id" --purge
@@ -58,15 +57,15 @@ echo "========================================="
 if qm status "$template_id" &>/dev/null && qm config "$template_id" | grep -q "^template: 1"; then
   echo "[SKIP] 已存在黃金映像 VM（ID: $template_id）"
   if [ -x "$clone_script" ]; then
-    echo "[INFO] 偵測到 clone 腳本，跳轉執行：$clone_script"
-    exec "$clone_script" "$@"
+    echo "[INFO] 執行 clone 子腳本：$clone_script"
+    bash "$clone_script" "$@"
+    echo "[INFO] clone 完成，返回主程式"
   else
-    echo "[WARN] 找到 template，但未偵測到可執行的 clone 腳本：$clone_script"
-    echo "[提示] 請確認腳本名稱與執行權限正確（chmod +x）"
+    echo "[ERROR] 找不到可執行的 clone 腳本：$clone_script"
     exit 1
   fi
-else
-  echo "[INFO] 尚未建立黃金映像 VM，將繼續建構流程..."
+  echo "[INFO] 結束主程式"
+  exit 0
 fi
 
 echo "========================================="
@@ -76,14 +75,14 @@ vm_id=$template_id
 echo "[INFO] 使用 VM ID：$vm_id"
 
 echo "========================================="
-echo "[4/11] 安裝必要套件 ..."
+echo "[3/11] 安裝必要套件 ..."
 echo "========================================="
 apt-get update -y
 apt-get install -y unar wget curl
 echo "[OK] 必要套件已安裝"
 
 echo "========================================="
-echo "[5/11] 下載 Kali QEMU 映像 ..."
+echo "[4/11] 下載 Kali QEMU 映像 ..."
 echo "========================================="
 cd "$working_dir"
 if [ "$skip_download" = false ]; then
@@ -94,13 +93,13 @@ else
 fi
 
 echo "========================================="
-echo "[6/11] 解壓縮 Kali 映像 ..."
+echo "[5/11] 解壓縮 Kali 映像 ..."
 echo "========================================="
 unar -f "$filename"
 echo "[OK] 解壓縮完成"
 
 echo "========================================="
-echo "[7/11] 搜尋 .qcow2 磁碟映像 ..."
+echo "[6/11] 搜尋 .qcow2 磁碟映像 ..."
 echo "========================================="
 qcow2file="$(find "$working_dir" -type f -name '*.qcow2' | head -n 1)"
 if [ -z "$qcow2file" ]; then
@@ -110,7 +109,7 @@ fi
 echo "[INFO] 找到映像檔：$qcow2file"
 
 echo "========================================="
-echo "[8/11] 建立 Kali Template VM ..."
+echo "[7/11] 建立 Kali Template VM ..."
 echo "========================================="
 qm create "$vm_id" \
   --name "kali-template" \
@@ -118,19 +117,33 @@ qm create "$vm_id" \
 echo "[OK] Template VM 建立完成"
 
 echo "========================================="
-echo "[9/11] 匯入 Kali 磁碟 ..."
+echo "[8/11] 匯入 Kali 磁碟 ..."
 echo "========================================="
 qm importdisk "$vm_id" "$qcow2file" "local-lvm" --format qcow2
 qm set "$vm_id" --scsi0 "local-lvm:vm-${vm_id}-disk-0"
 qm set "$vm_id" --boot order=scsi0
 
 echo "========================================="
-echo "[10/11] 跳轉清理腳本以準備轉為 Template ..."
+echo "[9/11] 執行 template 清理子腳本 ..."
 echo "========================================="
 if [ -x "$prepare_script" ]; then
-  echo "[INFO] 執行清理腳本：$prepare_script"
-  exec "$prepare_script" "$vm_id" "$@"
+  bash "$prepare_script" "$vm_id" "$@"
+  echo "[INFO] 清理完成，返回主程式"
 else
   echo "[ERROR] 找不到清理腳本或無執行權限：$prepare_script"
   exit 1
 fi
+
+echo "========================================="
+echo "[10/11] 檢查 Template 標記是否成功 ..."
+echo "========================================="
+if qm config "$vm_id" | grep -q "^template: 1"; then
+  echo "[OK] 已成功設為 Template"
+else
+  echo "[ERROR] 尚未設為 Template，請手動檢查"
+  exit 1
+fi
+
+echo "========================================="
+echo "[11/11] 所有流程完成，黃金映像建立成功 🎉"
+echo "========================================="
