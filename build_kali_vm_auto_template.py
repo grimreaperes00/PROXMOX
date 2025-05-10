@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# build_kali_vm_auto_template.py
+# build_kali_vm_fixed.py
 
 import os
 import re
@@ -7,7 +7,6 @@ import subprocess
 import requests
 import argparse
 import json
-from bs4 import BeautifulSoup
 from pathlib import Path
 
 TEMPLATE_ID = 9000
@@ -55,87 +54,73 @@ def convert_to_gb(size_str: str) -> str:
     if size_str.endswith("G"):
         return size_str
     elif size_str.endswith("M"):
-        size_in_mib = float(size_str[:-1])
-        size_in_gb = size_in_mib / 1024
-        return f"{size_in_gb:.1f}G"
+        return f"{float(size_str[:-1]) / 1024:.1f}G"
     elif size_str.endswith("K"):
-        size_in_kib = float(size_str[:-1])
-        size_in_gb = size_in_kib / (1024 * 1024)
-        return f"{size_in_gb:.2f}G"
+        return f"{float(size_str[:-1]) / (1024 * 1024):.2f}G"
+    return size_str
+
+def create_template(args):
+    vm_id = TEMPLATE_ID
+    working_dir = Path(args.workdir).resolve()
+    working_dir.mkdir(parents=True, exist_ok=True)
+
+    kali_dir, version, filename, kali_url = get_latest_kali_url("https://cdimage.kali.org/")
+    iso_path = working_dir / filename
+
+    if not iso_path.exists():
+        print(f"[INFO] 清空目錄：{working_dir}")
+        for f in working_dir.glob("*"):
+            f.unlink()
+        print(f"[INFO] 下載 Kali 映像：{kali_url}")
+        subprocess.run(["wget", "-c", "--retry-connrefused", "--tries=5", "--show-progress", kali_url], check=True)
     else:
-        return size_str
+        print(f"[SKIP] 已存在 .7z：{filename}")
+
+    qcow2file = next(working_dir.glob("*.qcow2"), None)
+    if not qcow2file:
+        print("[INFO] 解壓縮 Kali 映像 ...")
+        subprocess.run(["unar", "-f", filename], check=True)
+        print("[OK] 解壓縮完成")
+    else:
+        print(f"[SKIP] 偵測到已解壓的 .qcow2：{qcow2file.name}")
+
+    os.chdir(working_dir)
+    qcow2file = next(working_dir.glob("*.qcow2"), None)
+    if not qcow2file:
+        raise RuntimeError("找不到 qcow2 映像！")
+
+    subprocess.run(["qm", "create", str(vm_id),
+                    "--memory", str(args.max_mem),
+                    "--balloon", str(args.min_mem),
+                    "--cores", str(args.cpu),
+                    "--name", "kali-template",
+                    "--description", "Kali Golden Image Template",
+                    "--net0", f"model=virtio,bridge={args.bridge}",
+                    "--ostype", "l26",
+                    "--machine", "q35"], check=True)
+
+    subprocess.run(["qm", "importdisk", str(vm_id), str(qcow2file), args.storage, "--format", "qcow2"], check=True)
+    subprocess.run(["qm", "set", str(vm_id), "--scsi0", f"{args.storage}:vm-{vm_id}-disk-0"], check=True)
+    subprocess.run(["qm", "resize", str(vm_id), "scsi0", args.resize], check=True)
+    subprocess.run(["qm", "set", str(vm_id), "--boot", "order=scsi0", "--bootdisk", "scsi0"], check=True)
+    subprocess.run(["qm", "template", str(vm_id)], check=True)
+    print(f"[OK] Template VM 已建立於 ID {vm_id}")
 
 def deploy_vm(args, vm_index=None):
-    vm_id = find_available_vm_id(args.start_id or 100)
+    vm_id = find_available_vm_id(100)
     name = args.name if vm_index is None else f"{args.name}-{vm_index+1}"
     desc = args.description if vm_index is None else f"{args.description} #{vm_index+1}"
     net_config = f"model=virtio,firewall=0,bridge={args.bridge}"
     if args.vlan:
         net_config += f",tag={args.vlan}"
 
-    if args.template_id:
-        print(f"[INFO] 使用 Template VM (ID={args.template_id}) 快速複製 ...")
-        subprocess.run(["qm", "clone", str(args.template_id), str(vm_id), "--name", name], check=True)
-        subprocess.run(["qm", "set", str(vm_id),
-                        "--memory", str(args.max_mem),
-                        "--balloon", str(args.min_mem),
-                        "--cores", str(args.cpu),
-                        "--net0", net_config,
-                        "--description", desc], check=True)
-    else:
-        print(f"[INFO] 建立 Kali VM 並轉為黃金映像 ...")
-
-        working_dir = Path(args.workdir).resolve()
-        working_dir.mkdir(parents=True, exist_ok=True)
-
-        kali_dir, version, filename, kali_url = get_latest_kali_url("https://cdimage.kali.org/")
-        iso_path = working_dir / filename
-
-        if not iso_path.exists():
-            print(f"[INFO] 清空目錄：{working_dir}")
-            for f in working_dir.glob("*"):
-                f.unlink()
-            print(f"[INFO] 下載 Kali 映像：{kali_url}")
-            subprocess.run(["wget", "-c", "--retry-connrefused", "--tries=5", "--show-progress", kali_url], check=True)
-        else:
-            print(f"[SKIP] 已存在 .7z：{filename}")
-
-        qcow2file = next(working_dir.glob("*.qcow2"), None)
-        if not qcow2file:
-            print("[INFO] 解壓縮 Kali 映像 ...")
-            subprocess.run(["unar", "-f", filename], check=True)
-            print("[OK] 解壓縮完成")
-        else:
-            print(f"[SKIP] 偵測到已解壓的 .qcow2：{qcow2file.name}")
-
-        os.chdir(working_dir)
-        qcow2file = next(working_dir.glob("*.qcow2"), None)
-        if not qcow2file:
-            raise RuntimeError("找不到 qcow2 映像！")
-
-        subprocess.run(["qm", "create", str(vm_id),
-                        "--memory", str(args.max_mem),
-                        "--balloon", str(args.min_mem),
-                        "--cores", str(args.cpu),
-                        "--name", name,
-                        "--description", desc,
-                        "--net0", net_config,
-                        "--ostype", "l26",
-                        "--autostart", "1",
-                        "--startup", "order=10,up=30,down=30",
-                        "--machine", "q35"], check=True)
-
-        subprocess.run(["qm", "importdisk", str(vm_id), str(qcow2file), args.storage, "--format", "qcow2"], check=True)
-        subprocess.run(["qm", "set", str(vm_id), "--scsi0", f"{args.storage}:vm-{vm_id}-disk-0"], check=True)
-        subprocess.run(["qm", "resize", str(vm_id), "scsi0", args.resize], check=True)
-        subprocess.run(["qm", "set", str(vm_id), "--boot", "order=scsi0", "--bootdisk", "scsi0"], check=True)
-
-        if not Path("/dev/kvm").exists():
-            subprocess.run(["qm", "set", str(vm_id), "--kvm", "0"], check=True)
-
-        subprocess.run(["qm", "template", str(vm_id)], check=True)
-        print(f"[OK] Template VM 已建立於 ID {vm_id}")
-
+    subprocess.run(["qm", "clone", str(TEMPLATE_ID), str(vm_id), "--name", name], check=True)
+    subprocess.run(["qm", "set", str(vm_id),
+                    "--memory", str(args.max_mem),
+                    "--balloon", str(args.min_mem),
+                    "--cores", str(args.cpu),
+                    "--net0", net_config,
+                    "--description", desc], check=True)
     subprocess.run(["qm", "start", str(vm_id)], check=True)
 
     vm_ip = "未知"
@@ -152,7 +137,6 @@ def deploy_vm(args, vm_index=None):
         pass
 
     disk_size = get_disk_size_gb(vm_id, args.storage)
-
     print(f"\n✅ Kali VM 建立完成")
     print(f"📌 VM 名稱：{name} (VM ID: {vm_id})")
     print(f"🧠 記憶體：{args.min_mem} ~ {args.max_mem} MB")
@@ -163,10 +147,9 @@ def deploy_vm(args, vm_index=None):
     print(f"📂 儲存位置：{Path(args.workdir).resolve()}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="建立 Kali VM 並自動化導入 Proxmox")
-    parser.add_argument("--count", type=int, default=1, choices=range(1, 1001), metavar="[1-1000]", help="要建立的 VM 數量")
+    parser = argparse.ArgumentParser(description="建立 Kali Template 並快速複製 VM")
+    parser.add_argument("--count", type=int, default=1, help="要建立的 VM 數量")
     parser.add_argument("--workdir", default="/var/lib/vz/template/iso/kali-images", help="工作目錄")
-    parser.add_argument("--start-id", type=int, help="起始 VM ID（預設自動分配）")
     parser.add_argument("--name", default="kali-vm", help="VM 名稱")
     parser.add_argument("--description", default="Kali VM auto-generated", help="VM 說明")
     parser.add_argument("--min-mem", type=int, default=4096, help="最小記憶體")
@@ -178,14 +161,9 @@ if __name__ == "__main__":
     parser.add_argument("--storage", default="local-lvm", help="儲存目標名稱")
     args = parser.parse_args()
 
-    template_conf = Path(f"/etc/pve/qemu-server/{TEMPLATE_ID}.conf")
-    if template_conf.exists():
-        print(f"[INFO] 偵測到 Template VM {TEMPLATE_ID}，將使用 clone 模式 ...")
-        args.template_id = TEMPLATE_ID
-    else:
-        print(f"[INFO] 尚未存在 Template VM，將建立黃金映像 ...")
-        args.template_id = None
-        args.start_id = TEMPLATE_ID
+    if not Path(f"/etc/pve/qemu-server/{TEMPLATE_ID}.conf").exists():
+        print(f"[INFO] 尚未存在 Template VM，開始建立 ...")
+        create_template(args)
 
     for i in range(args.count):
         deploy_vm(args, i)
