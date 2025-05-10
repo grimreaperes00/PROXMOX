@@ -4,19 +4,18 @@
 - clone_kali_vm.sh  自動化KALI VM程式(未撰寫)
 
 - build_kali_vm.py參數資訊
-```markdown
-| 參數              | 類型    | 預設值                                      | 說明                                          |
-| --------------- | ----- | ---------------------------------------- | ------------------------------------------- |
-| `--count`       | `int` | `1`                                      | 要建立的 VM 數量，**最少為 1 台**（限制 1–1000）           |
-| `--start-id`    | `int` | 無（自動從 `100` 開始）                          | VM ID 起始編號，將從指定 ID 起自動遞增找可用 ID              |
-| `--name`        | `str` | `"kali-vm"`                              | VM 名稱，若建立多台會自動命名為 `kali-vm-1`、`kali-vm-2` 等 |
-| `--description` | `str` | `"Kali VM imported automatically"`       | VM 描述文字，若為多台會加上編號 `#1`、`#2` 等               |
-| `--min-mem`     | `int` | `4096`                                   | 最小記憶體（MB），用於記憶體 Ballooning 下限               |
-| `--max-mem`     | `int` | `8192`                                   | 最大記憶體（MB）                                   |
-| `--cpu`         | `int` | `4`                                      | VM 處理器核心數                                   |
-| `--bridge`      | `str` | `"vmbr0"`                                | 指定 Proxmox 網橋名稱（如 `vmbr0`）                  |
-| `--vlan`        | `str` | 無                                        | VLAN Tag，例如 `110`，如不需 VLAN 可略過              |
-| `--resize`      | `str` | `+20G`                                   | 虛擬磁碟額外擴充大小（支援 `+10G`、`+10240M` 等格式）         |
-| `--storage`     | `str` | `"local-lvm"`                            | Proxmox 儲存目標名稱，例如 `local-lvm`, `zfs-ssd`    |
-| `--workdir`     | `str` | `"/var/lib/vz/template/iso/kali-images"` | 作業資料夾，用來存放下載的 `.7z` 和解壓的 `.qcow2`           |
-```
+| 參數           | 類型   | 預設值                                  | 說明                                                                 |
+|----------------|--------|------------------------------------------|----------------------------------------------------------------------|
+| `--count`      | `int`  | `1`                                      | 要建立的 VM 數量，**最少為 1 台**（限制 1-1000）                    |
+| `--start-id`   | `int`  | 無（自動從 `100` 開始）                  | VM ID 起始編號，將從其起 ID 自動遞增找可用 ID                        |
+| `--name`       | `str`  | `"kali-vm"`                              | VM 名稱，若建立多台會自動命名為 `kali-vm-1`、`kali-vm-2` 等         |
+| `--description`| `str`  | `"Kali VM imported automatically"`       | VM 描述文字，若為多台會加上編號 `#1`、`#2` 等                        |
+| `--min-mem`    | `int`  | `4096`                                   | 最小記憶體（MB），用於記憶體 Ballooning 下限                         |
+| `--max-mem`    | `int`  | `8192`                                   | 最大記憶體（MB）                                                     |
+| `--cpu`        | `int`  | `4`                                      | VM 處理器核心數                                                      |
+| `--bridge`     | `str`  | `"vmbr0"`                                | 指定 Proxmox 網橋名稱（如 `vmbr0`）                                 |
+| `--vlan`       | `int`  | 無                                       | VLAN Tag，例如 `110`，如不需 VLAN 可略過                            |
+| `--resize`     | `str`  | `"+20G"`                                 | 虛擬磁碟額外擴充大小（支援 `+10G`、`+10240M` 等格式）               |
+| `--storage`    | `str`  | `"local-lvm"`                            | Proxmox 儲存目標名稱，例如 `local-lvm`、`zfs-ssd`                    |
+| `--workdir`    | `str`  | `"/var/lib/vz/template/iso/kali-images"` | 作業資料夾，用來存放下載的 `.7z` 和解壓的 `.qcow2`                  |
+
