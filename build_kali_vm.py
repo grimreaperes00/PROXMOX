@@ -47,6 +47,21 @@ def get_disk_size_gb(vm_id: int, storage: str) -> str:
                     return p.split("=")[-1]
     return "未知"
 
+def convert_to_gb(size_str: str) -> str:
+    size_str = size_str.strip().upper()
+    if size_str.endswith("G"):
+        return size_str
+    elif size_str.endswith("M"):
+        size_in_mib = float(size_str[:-1])
+        size_in_gb = size_in_mib / 1024
+        return f"{size_in_gb:.1f}G"
+    elif size_str.endswith("K"):
+        size_in_kib = float(size_str[:-1])
+        size_in_gb = size_in_kib / (1024 * 1024)
+        return f"{size_in_gb:.2f}G"
+    else:
+        return size_str
+
 def main(args):
     base_url = "https://cdimage.kali.org/"
     working_dir = Path(args.workdir).resolve()
@@ -122,7 +137,7 @@ def main(args):
     print(f"🧠 記憶體：{args.min_mem} ~ {args.max_mem} MB")
     print(f"🧮 CPU 核心數：{args.cpu}")
     print(f"🌐 網路：bridge={args.bridge}" + (f", vlan={args.vlan}" if args.vlan else ""))
-    print(f"💾 磁碟大小：{disk_size}")
+    print(f"💾 磁碟大小：{convert_to_gb(disk_size)}")
     print(f"📂 儲存位置：{working_dir}")
 
 if __name__ == "__main__":
