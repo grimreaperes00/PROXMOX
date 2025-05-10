@@ -19,7 +19,7 @@ def get_latest_kali_url(base_url: str):
     filename = f"kali-linux-{version}-qemu-amd64.7z"
     return kali_dir, version, filename, f"{base_url}{kali_dir}/{filename}"
 
-def find_available_vm_id(start: int):
+def find_available_vm_id(start: int = 100):
     while True:
         result = subprocess.run(["qm", "status", str(start)],
                                 stdout=subprocess.DEVNULL,
@@ -41,7 +41,12 @@ def main(args):
         for f in working_dir.glob("*"):
             f.unlink()
 
-    vm_id = find_available_vm_id(args.start_id)
+    if args.start_id:
+        vm_id = find_available_vm_id(args.start_id)
+    else:
+        print("[INFO] 未指定 VM ID，從 100 開始自動尋找 ...")
+        vm_id = find_available_vm_id()
+    print(f"[INFO] 分配到可用 VM ID：{vm_id}")
 
     subprocess.run(["apt-get", "update", "-y"], check=True)
     subprocess.run(["apt-get", "install", "-y", "unar", "wget", "curl"], check=True)
@@ -91,12 +96,15 @@ def main(args):
 
     subprocess.run(["qm", "start", str(vm_id)], check=True)
 
-    print(f"\n✅ Kali VM 建立完成\nVM ID: {vm_id}\nDisk Resize: {args.resize}\nSaved in: {working_dir}")
+    print(f"\n✅ Kali VM 建立完成")
+    print(f"📌 分配 VM ID：{vm_id}")
+    print(f"💾 磁碟擴充：{args.resize}")
+    print(f"📂 儲存位置：{working_dir}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="建立 Kali VM 並自動化導入 Proxmox")
     parser.add_argument("--workdir", default="/var/lib/vz/template/iso/kali-images", help="工作目錄")
-    parser.add_argument("--start-id", type=int, default=136, help="起始 VM ID")
+    parser.add_argument("--start-id", type=int, help="起始 VM ID（預設自動分配）")
     parser.add_argument("--name", default="kali-vm", help="VM 名稱")
     parser.add_argument("--description", default="Kali VM imported automatically", help="VM 說明")
     parser.add_argument("--min-mem", type=int, default=4096, help="最小記憶體")
