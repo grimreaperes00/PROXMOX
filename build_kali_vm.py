@@ -62,7 +62,7 @@ def convert_to_gb(size_str: str) -> str:
     else:
         return size_str
 
-def main(args):
+def deploy_vm(args, vm_index=None):
     base_url = "https://cdimage.kali.org/"
     working_dir = Path(args.workdir).resolve()
     working_dir.mkdir(parents=True, exist_ok=True)
@@ -97,6 +97,8 @@ def main(args):
         vm_id = find_available_vm_id()
     print(f"[INFO] 分配到可用 VM ID：{vm_id}")
 
+    name = args.name if vm_index is None else f"{args.name}-{vm_index+1}"
+    desc = args.description if vm_index is None else f"{args.description} #{vm_index+1}"
     subprocess.run(["apt-get", "update", "-y"], check=True)
     subprocess.run(["apt-get", "install", "-y", "unar", "wget", "curl"], check=True)
 
@@ -115,8 +117,8 @@ def main(args):
         "--memory", str(args.max_mem),
         "--balloon", str(args.min_mem),
         "--cores", str(args.cpu),
-        "--name", args.name,
-        "--description", args.description,
+        "--name", name,
+        "--description", desc,
         "--net0", net_config,
         "--ostype", "l26",
         "--autostart", "1",
@@ -140,21 +142,39 @@ def main(args):
 
     subprocess.run(["qm", "start", str(vm_id)], check=True)
 
+    
+    # 嘗試取得 VM 的 IP（需等待 cloud-init 或 DHCP 生效）
+    vm_ip = "未知"
+    try:
+        result = subprocess.run(["qm", "guest", "cmd", str(vm_id), "network-get-interfaces"], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and "ip-addresses" in result.stdout:
+            import json
+            data = json.loads(result.stdout)
+            for interface in data:
+                for ip in interface.get("ip-addresses", []):
+                    if ip.get("ip-address-type") == "ipv4":
+                        vm_ip = ip.get("ip-address")
+                        break
+    except Exception:
+        pass
+
     disk_size = get_disk_size_gb(vm_id, args.storage)
 
     print(f"\n✅ Kali VM 建立完成")
-    print(f"📌 VM ID：{vm_id}")
+    print(f"📌 VM 名稱：{name} (VM ID: {vm_id})")
     print(f"🧠 記憶體：{args.min_mem} ~ {args.max_mem} MB")
     print(f"🧮 CPU 核心數：{args.cpu}")
     print(f"🌐 網路：bridge={args.bridge}" + (f", vlan={args.vlan}" if args.vlan else ""))
     print(f"💾 磁碟大小：{convert_to_gb(disk_size)}")
+    print(f"🌐 IP 位址：{vm_ip}")
     print(f"📂 儲存位置：{working_dir}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="建立 Kali VM 並自動化導入 Proxmox")
+    parser.add_argument("--count", type=int, default=1, choices=range(1, 1001), metavar="[1-1000]", help="要建立的 VM 數量，至少為 1 台")
     parser.add_argument("--workdir", default="/var/lib/vz/template/iso/kali-images", help="工作目錄")
     parser.add_argument("--start-id", type=int, help="起始 VM ID（預設自動分配）")
-    parser.add_argument("--name", default="kali-vm", help="VM 名稱")
+    parser.add_argument("--name", default="kali-vm", help="VM 名稱（多台時將加上序號）", help="VM 名稱")
     parser.add_argument("--description", default="Kali VM imported automatically", help="VM 說明")
     parser.add_argument("--min-mem", type=int, default=4096, help="最小記憶體")
     parser.add_argument("--max-mem", type=int, default=8192, help="最大記憶體")
@@ -164,4 +184,5 @@ if __name__ == "__main__":
     parser.add_argument("--resize", default="+20G", help="磁碟擴充大小")
     parser.add_argument("--storage", default="local-lvm", help="儲存目標名稱")
     args = parser.parse_args()
-    main(args)
+    for i in range(args.count):
+        deploy_vm(args, i)
