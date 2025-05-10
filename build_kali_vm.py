@@ -174,7 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("--count", type=int, default=1, choices=range(1, 1001), metavar="[1-1000]", help="要建立的 VM 數量，至少為 1 台")
     parser.add_argument("--workdir", default="/var/lib/vz/template/iso/kali-images", help="工作目錄")
     parser.add_argument("--start-id", type=int, help="起始 VM ID（預設自動分配）")
-    parser.add_argument("--name", default="kali-vm", help="VM 名稱（多台時將加上序號）", help="VM 名稱")
+    parser.add_argument("--name", default="kali-vm", help="VM 名稱（多台時將加上序號）")
     parser.add_argument("--description", default="Kali VM imported automatically", help="VM 說明")
     parser.add_argument("--min-mem", type=int, default=4096, help="最小記憶體")
     parser.add_argument("--max-mem", type=int, default=8192, help="最大記憶體")
