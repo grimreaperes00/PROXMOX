@@ -19,12 +19,19 @@ def get_latest_kali_url(base_url: str):
     filename = f"kali-linux-{version}-qemu-amd64.7z"
     return kali_dir, version, filename, f"{base_url}{kali_dir}/{filename}"
 
+def id_in_use(vm_id: int) -> bool:
+    # 檢查是否為已存在的 VM 或 CT
+    vm_check = subprocess.run(["qm", "status", str(vm_id)],
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL)
+    ct_check = subprocess.run(["pct", "status", str(vm_id)],
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL)
+    return vm_check.returncode == 0 or ct_check.returncode == 0
+
 def find_available_vm_id(start: int = 100):
     while True:
-        result = subprocess.run(["qm", "status", str(start)],
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL)
-        if result.returncode != 0:
+        if not id_in_use(start):
             return start
         start += 1
 
