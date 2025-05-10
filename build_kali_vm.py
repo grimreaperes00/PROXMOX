@@ -20,7 +20,6 @@ def get_latest_kali_url(base_url: str):
     return kali_dir, version, filename, f"{base_url}{kali_dir}/{filename}"
 
 def id_in_use(vm_id: int) -> bool:
-    # 檢查是否為已存在的 VM 或 CT
     vm_check = subprocess.run(["qm", "status", str(vm_id)],
                               stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
@@ -34,6 +33,19 @@ def find_available_vm_id(start: int = 100):
         if not id_in_use(start):
             return start
         start += 1
+
+def get_disk_size_gb(vm_id: int, storage: str) -> str:
+    result = subprocess.run(["qm", "config", str(vm_id)],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True)
+    for line in result.stdout.splitlines():
+        if line.strip().startswith("scsi0:") and f"{storage}:" in line:
+            parts = line.split(",")
+            for p in parts:
+                if p.strip().startswith("size="):
+                    return p.split("=")[-1]
+    return "未知"
 
 def main(args):
     base_url = "https://cdimage.kali.org/"
@@ -103,9 +115,14 @@ def main(args):
 
     subprocess.run(["qm", "start", str(vm_id)], check=True)
 
+    disk_size = get_disk_size_gb(vm_id, args.storage)
+
     print(f"\n✅ Kali VM 建立完成")
-    print(f"📌 分配 VM ID：{vm_id}")
-    print(f"💾 磁碟擴充：{args.resize}")
+    print(f"📌 VM ID：{vm_id}")
+    print(f"🧠 記憶體：{args.min_mem} ~ {args.max_mem} MB")
+    print(f"🧮 CPU 核心數：{args.cpu}")
+    print(f"🌐 網路：bridge={args.bridge}" + (f", vlan={args.vlan}" if args.vlan else ""))
+    print(f"💾 磁碟大小：{disk_size}")
     print(f"📂 儲存位置：{working_dir}")
 
 if __name__ == "__main__":
