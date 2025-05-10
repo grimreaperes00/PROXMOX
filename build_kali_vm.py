@@ -70,10 +70,25 @@ def main(args):
     kali_dir, version, filename, kali_url = get_latest_kali_url(base_url)
     iso_path = working_dir / filename
 
-    skip_download = iso_path.exists()
-    if not skip_download:
+    # 判斷是否為新版本 .7z
+    if not iso_path.exists():
+        print(f"[INFO] 發現新版本，清空目錄：{working_dir}")
         for f in working_dir.glob("*"):
             f.unlink()
+        print(f"[INFO] 開始下載：{kali_url}")
+        subprocess.run(["wget", "-c", "--retry-connrefused", "--tries=5",
+                        "--show-progress", kali_url], check=True)
+    else:
+        print(f"[SKIP] 已存在最新版 .7z：{filename}")
+
+    # 判斷是否需解壓
+    qcow2file = next(working_dir.glob("*.qcow2"), None)
+    if not qcow2file:
+        print("[INFO] 未發現 .qcow2，執行解壓縮 ...")
+        subprocess.run(["unar", "-f", filename], check=True)
+        print("[OK] 解壓縮完成")
+    else:
+        print(f"[SKIP] 偵測到已解壓的 .qcow2：{qcow2file.name}")
 
     if args.start_id:
         vm_id = find_available_vm_id(args.start_id)
@@ -86,11 +101,6 @@ def main(args):
     subprocess.run(["apt-get", "install", "-y", "unar", "wget", "curl"], check=True)
 
     os.chdir(working_dir)
-    if not skip_download:
-        subprocess.run(["wget", "-c", "--retry-connrefused", "--tries=5",
-                        "--show-progress", kali_url], check=True)
-
-    subprocess.run(["unar", "-f", filename], check=True)
 
     qcow2file = next(working_dir.glob("*.qcow2"), None)
     if not qcow2file:
