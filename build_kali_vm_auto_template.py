@@ -61,11 +61,16 @@ def convert_to_gb(size_str: str) -> str:
 def wait_for_ip(vm_id, retries=10, delay=3):
     for _ in range(retries):
         try:
-            result = subprocess.run(["qm", "guest", "cmd", str(vm_id), "network-get-interfaces"],
-                                    capture_output=True, text=True, timeout=5)
+            result = subprocess.run(
+                ["qm", "guest", "cmd", str(vm_id), "network-get-interfaces"],
+                capture_output=True, text=True, timeout=5
+            )
             if result.returncode == 0 and "ip-addresses" in result.stdout:
                 data = json.loads(result.stdout)
                 for interface in data:
+                    # 僅抓 interface-name 含 eth 或 en（如 eth0、ens18）
+                    if not any(prefix in interface.get("name", "") for prefix in ["eth", "en"]):
+                        continue
                     for ip in interface.get("ip-addresses", []):
                         if ip.get("ip-address-type") == "ipv4":
                             return ip.get("ip-address")
