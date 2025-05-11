@@ -1,7 +1,4 @@
-- test_kali.sh 目前可作用新增KALI VM
-- template_kali.sh 自動化KALI主程式(未測試與template_prepare & clone_kali_vm有連貫性)
-- template_prepare.sh 自動化清理範本VM固定資訊(未測試)
-- clone_kali_vm.sh  自動化KALI VM程式(未撰寫)
+- test_kali.sh 最基礎可作用新增KALI VM
 
 - 參數資訊欄
 ```markdown
