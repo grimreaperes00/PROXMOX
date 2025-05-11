@@ -1,4 +1,10 @@
-- test_kali.sh 最基礎可作用新增KALI VM
+- test_kali.sh 最基礎可作用新增KALI VM無任何參數定義
+
+- 請先下載PYTHON套件
+```
+apt install python3-pip -y
+```
+- build_kali_vm_auto_template.py 當前最新KALI VM版本(參數如下)
 
 - 參數資訊欄
 ```markdown
@@ -15,10 +21,5 @@
 | `--vlan`        | `str` | `None`（選填）                             | 若有 VLAN tag，可指定如 `10`、`20` 等。                     |
 | `--resize`      | `str` | `+20G`                                 | VM 磁碟擴充大小（基於 .qcow2 映像基礎上）。                       |
 | `--storage`     | `str` | `local-lvm`                            | 儲存磁碟的 Proxmox storage 名稱，如 `local-lvm`、`ceph-ssd` 等。|
+```
 
-```
-- 請先下載PYTHON套件
-```
-apt install python3-pip -y
-```
-- build_kali_vm_auto_template.py 當前最新KALI VM版本(參數如上)
