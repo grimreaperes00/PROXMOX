@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # 自動建立 Kali Template 並批次建立 VM，集中顯示所有 VM 資訊
+# 若偵測到新版 Kali QEMU 映像，會清空原始資料夾並刪除黃金映像 VM（ID 9000）
 
 import os
 import re
@@ -13,7 +14,7 @@ from pathlib import Path
 # 固定黃金映像 VM ID
 TEMPLATE_ID = 9000
 
-# 從 Kali 官方網頁解析出最新的 QEMU 映像資訊
+# 從 Kali 官方網站解析最新版本與下載連結
 def get_latest_kali_url(base_url: str):
     response = requests.get(base_url)
     dirs = sorted(set(re.findall(r'kali-\d+\.\d+[a-z]?/', response.text)), reverse=True)
@@ -24,19 +25,19 @@ def get_latest_kali_url(base_url: str):
     filename = f"kali-linux-{version}-qemu-amd64.7z"
     return kali_dir, version, filename, f"{base_url}{kali_dir}/{filename}"
 
-# 判斷該 VM ID 是否已被使用
+# 判斷 VM ID 是否被使用中
 def id_in_use(vm_id: int) -> bool:
     vm_check = subprocess.run(["qm", "status", str(vm_id)], stdout=subprocess.DEVNULL)
     ct_check = subprocess.run(["pct", "status", str(vm_id)], stdout=subprocess.DEVNULL)
     return vm_check.returncode == 0 or ct_check.returncode == 0
 
-# 從指定起始值向上找一個可用的 VM ID
+# 從指定 ID 起尋找未佔用的 VM ID
 def find_available_vm_id(start: int = 100):
     while id_in_use(start):
         start += 1
     return start
 
-# 從 VM 設定中讀取磁碟大小
+# 從 VM 配置中讀取 scsi0 的磁碟大小
 def get_disk_size_gb(vm_id: int, storage: str) -> str:
     result = subprocess.run(["qm", "config", str(vm_id)], stdout=subprocess.PIPE, text=True)
     for line in result.stdout.splitlines():
@@ -46,7 +47,7 @@ def get_disk_size_gb(vm_id: int, storage: str) -> str:
                     return p.split("=")[-1]
     return "未知"
 
-# 將單位轉為 GiB 格式
+# 將單位轉為 GiB 顯示
 def convert_to_gb(size_str: str) -> str:
     size_str = size_str.strip().upper()
     if size_str.endswith("G"):
@@ -57,18 +58,16 @@ def convert_to_gb(size_str: str) -> str:
         return f"{float(size_str[:-1]) / (1024 * 1024):.2f}G"
     return size_str
 
-# 嘗試等待 VM 開啟後回傳 IP（透過 QEMU Guest Agent）
+# 等待 VM 啟動後取得 IP（透過 qemu-guest-agent）
 def wait_for_ip(vm_id, retries=10, delay=3):
     for _ in range(retries):
         try:
-            result = subprocess.run(
-                ["qm", "guest", "cmd", str(vm_id), "network-get-interfaces"],
-                capture_output=True, text=True, timeout=5
-            )
+            result = subprocess.run(["qm", "guest", "cmd", str(vm_id), "network-get-interfaces"],
+                                    capture_output=True, text=True, timeout=5)
             if result.returncode == 0 and "ip-addresses" in result.stdout:
                 data = json.loads(result.stdout)
                 for interface in data:
-                    # 跳過 loopback (lo)，但接受任何其他介面
+                    # 跳過 loopback (lo)
                     if interface.get("name") == "lo":
                         continue
                     for ip in interface.get("ip-addresses", []):
@@ -79,38 +78,59 @@ def wait_for_ip(vm_id, retries=10, delay=3):
         time.sleep(delay)
     return "未知"
 
-# 建立 Kali Template
+# 建立黃金映像模板，若版本不同則自動刪除舊有黃金映像 VM 並更新
 def create_template(args):
     vm_id = TEMPLATE_ID
     working_dir = Path(args.workdir).resolve()
     working_dir.mkdir(parents=True, exist_ok=True)
 
+    # 抓取最新版 Kali QEMU 映像資訊
     kali_dir, version, filename, kali_url = get_latest_kali_url("https://cdimage.kali.org/")
     iso_path = working_dir / filename
+    version_file = working_dir / ".kali_version"
 
-    if not iso_path.exists():
-        print(f"[INFO] 清空目錄：{working_dir}")
+    # 判斷版本是否有更新
+    version_changed = True
+    if version_file.exists():
+        with version_file.open() as vf:
+            current_version = vf.read().strip()
+            if current_version == version:
+                version_changed = False
+
+    # 若版本不同 → 清空映像檔與刪除 VM ID 9000
+    if version_changed:
+        print(f"[INFO] 偵測到新版 Kali：{version}，清除舊有映像與 template VM ...")
         for f in working_dir.glob("*"):
             f.unlink()
-        print(f"[INFO] 開始下載 Kali 映像：{kali_url}")
+        template_conf = Path(f"/etc/pve/qemu-server/{vm_id}.conf")
+        if template_conf.exists():
+            print(f"[INFO] 刪除 VM ID {vm_id} ...")
+            subprocess.run(["qm", "destroy", str(vm_id)], check=True)
+        with version_file.open("w") as vf:
+            vf.write(version)
+
+    # 映像檔不存在就下載
+    if not iso_path.exists():
+        print(f"[INFO] 下載 Kali 映像：{kali_url}")
         subprocess.run(["wget", "-c", "--retry-connrefused", "--tries=5", "--show-progress", kali_url], check=True)
     else:
-        print(f"[SKIP] 已存在 .7z：{filename}")
+        print(f"[SKIP] 映像已存在：{filename}")
 
+    # 解壓縮 .qcow2
     qcow2file = next(working_dir.glob("*.qcow2"), None)
     if not qcow2file:
         print("[INFO] 解壓縮 Kali 映像 ...")
         subprocess.run(["unar", "-f", filename], check=True)
         print("[OK] 解壓縮完成")
     else:
-        print(f"[SKIP] 偵測到已解壓的 .qcow2：{qcow2file.name}")
+        print(f"[SKIP] 偵測到已解壓：{qcow2file.name}")
 
     os.chdir(working_dir)
     qcow2file = next(working_dir.glob("*.qcow2"), None)
     if not qcow2file:
         raise RuntimeError("找不到 qcow2 映像！")
 
-    # 建立 VM 並轉為 Template
+    # 建立黃金映像 VM 並轉為 template
     subprocess.run(["qm", "create", str(vm_id),
                     "--memory", str(args.max_mem),
                     "--balloon", str(args.min_mem),
@@ -127,7 +147,7 @@ def create_template(args):
     subprocess.run(["qm", "template", str(vm_id)], check=True)
     print(f"[OK] Template VM 已建立於 ID {vm_id}")
 
-# 複製一台 VM 並抓取其資訊
+# 複製 template 並部署一台 VM
 def deploy_vm(args, vm_index=None):
     vm_id = find_available_vm_id(100)
     name = args.name if vm_index is None else f"{args.name}-{vm_index+1}"
@@ -158,7 +178,7 @@ def deploy_vm(args, vm_index=None):
         "disk": convert_to_gb(disk)
     }
 
-# 主程式入口
+# 主流程：建立黃金映像（如需），部署多台 VM 並集中顯示
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="建立 Kali Template 並批次建立 VM（集中顯示資訊）")
     parser.add_argument("--count", type=int, default=1, help="要建立的 VM 數量")
@@ -174,18 +194,16 @@ if __name__ == "__main__":
     parser.add_argument("--storage", default="local-lvm", help="儲存目標名稱")
     args = parser.parse_args()
 
-    # 若無黃金映像則建立
     if not Path(f"/etc/pve/qemu-server/{TEMPLATE_ID}.conf").exists():
-        print(f"[INFO] 尚未存在 Template VM，開始建立 ...")
+        print(f"[INFO] 尚未存在黃金映像，開始建立 ...")
         create_template(args)
 
-    # 建立多台 VM 並集中收集結果
     all_vms = []
     for i in range(args.count):
         info = deploy_vm(args, i)
         all_vms.append(info)
 
-    # 最後集中輸出結果
+    # 最後集中輸出所有 VM 狀態
     print("\n=== 所有 Kali VM 建立完成 ===\n")
     for vm in all_vms:
         print(f"📌 VM {vm['name']} (ID: {vm['vm_id']})")
