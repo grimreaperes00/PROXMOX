@@ -63,7 +63,7 @@ def convert_to_gb(size_str: str) -> str:
         return f"{float(size_str[:-1]) / (1024 * 1024):.2f}G"
     return size_str
 
-# 等待 VM 啟動並透過 guest agent 回傳 IP
+# 等待 VM 啟動並透過 guest agent 回傳 eth0 的 IP
 def wait_for_ip(vm_id, retries=10, delay=3):
     for _ in range(retries):
         try:
@@ -74,7 +74,8 @@ def wait_for_ip(vm_id, retries=10, delay=3):
             if result.returncode == 0:
                 data = json.loads(result.stdout)
                 for iface in data:
-                    if iface.get("name") == "lo":
+                    # 僅處理 eth0 或 ens* 等常見主介面
+                    if iface.get("name") not in ["eth0", "ens18", "ens3", "enp0s3"]:
                         continue
                     for ip in iface.get("ip-addresses", []):
                         if ip.get("ip-address-type") == "ipv4" and ip.get("ip-address") != "127.0.0.1":
