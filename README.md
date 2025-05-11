@@ -20,4 +20,5 @@
 | `--storage`    | `str`  | `"local-lvm"`                            | Proxmox 儲存目標名稱，例如 `local-lvm`、`zfs-ssd`           |
 | `--workdir`    | `str`  | `"/var/lib/vz/template/iso/kali-images"` | 作業資料夾，用來存放下載的 `.7z` 和解壓的 `.qcow2`            |
 ```
-
+- build_kali_vm_auto_template.py參數如上
+- build_kali_vm_final_wait.py 如下載最新的KALI的QEMU檔，要清除當前的黃金映象檔(未測)
