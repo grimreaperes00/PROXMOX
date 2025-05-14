@@ -127,7 +127,8 @@ def create_template(args, version):
                     "--machine", "q35"], check=True)
     subprocess.run(["qm", "importdisk", str(vm_id), str(qcow2file), args.storage, "--format", "qcow2"], check=True)
     subprocess.run(["qm", "set", str(vm_id), "--scsi0", f"{args.storage}:vm-{vm_id}-disk-0"], check=True)
-    subprocess.run(["qm", "resize", str(vm_id), "scsi0", args.resize], check=True)
+    if args.resize != "+0G":
+        subprocess.run(["qm", "resize", str(vm_id), "scsi0", args.resize], check=True)
     subprocess.run(["qm", "set", str(vm_id), "--boot", "order=scsi0", "--bootdisk", "scsi0"], check=True)
     subprocess.run(["qm", "template", str(vm_id)], check=True)
 
@@ -177,7 +178,7 @@ if __name__ == "__main__":
     parser.add_argument("--cpu", type=int, default=4)
     parser.add_argument("--bridge", default="vmbr0")
     parser.add_argument("--vlan", type=str)
-    parser.add_argument("--resize", default="+20G")
+    parser.add_argument("--resize", default="+0G", help="磁碟大小調整值，例如 +10G 或 +0G 表示不變更")
     parser.add_argument("--storage", default="local-lvm")
     parser.add_argument("--workdir", default="/var/lib/vz/template/iso/kali-images")
     args = parser.parse_args()
