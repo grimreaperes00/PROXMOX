@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# Proxmox 自動建立 Kali VM 腳本（修正版：下載與解壓皆儲存於正確工作路徑）
-
 import os
 import re
 import subprocess
@@ -13,7 +11,6 @@ from pathlib import Path
 
 TEMPLATE_ID = 9000  # 固定的黃金映像 VM ID
 
-# 安裝必要套件，如 unar
 def ensure_installed(package_name):
     if shutil.which(package_name) is None:
         print(f"[INFO] 未安裝 {package_name}，正在安裝 ...")
@@ -22,7 +19,6 @@ def ensure_installed(package_name):
     else:
         print(f"[SKIP] 已安裝 {package_name}，跳過安裝")
 
-# 從 Kali 官方網站抓取最新版本 QEMU 映像資訊
 def get_latest_kali_url(base_url: str):
     response = requests.get(base_url)
     dirs = sorted(set(re.findall(r'kali-\d+\.\d+[a-z]?/', response.text)), reverse=True)
@@ -33,17 +29,14 @@ def get_latest_kali_url(base_url: str):
     filename = f"kali-linux-{version}-qemu-amd64.7z"
     return kali_dir, version, filename, f"{base_url}{kali_dir}/{filename}"
 
-# 檢查 VM ID 是否已存在
 def id_in_use(vm_id: int) -> bool:
     return subprocess.run(["qm", "status", str(vm_id)], stdout=subprocess.DEVNULL).returncode == 0
 
-# 尋找可用的 VM ID
 def find_available_vm_id(start: int = 100):
     while id_in_use(start):
         start += 1
     return start
 
-# 取得磁碟大小資訊
 def get_disk_size_gb(vm_id: int, storage: str) -> str:
     result = subprocess.run(["qm", "config", str(vm_id)], stdout=subprocess.PIPE, text=True)
     for line in result.stdout.splitlines():
@@ -53,7 +46,6 @@ def get_disk_size_gb(vm_id: int, storage: str) -> str:
                     return part.split("=")[1]
     return "未知"
 
-# 轉換容量格式為 GiB
 def convert_to_gb(size_str: str) -> str:
     if size_str.endswith("G"):
         return size_str
@@ -63,7 +55,6 @@ def convert_to_gb(size_str: str) -> str:
         return f"{float(size_str[:-1]) / (1024 * 1024):.2f}G"
     return size_str
 
-# 等待 VM 啟動並透過 guest agent 回傳 eth0 的 IP
 def wait_for_ip(vm_id, retries=10, delay=3):
     for _ in range(retries):
         try:
@@ -74,7 +65,6 @@ def wait_for_ip(vm_id, retries=10, delay=3):
             if result.returncode == 0:
                 data = json.loads(result.stdout)
                 for iface in data:
-                    # 僅處理 eth0 或 ens* 等常見主介面
                     if iface.get("name") not in ["eth0", "ens18", "ens3", "enp0s3"]:
                         continue
                     for ip in iface.get("ip-addresses", []):
@@ -85,7 +75,6 @@ def wait_for_ip(vm_id, retries=10, delay=3):
         time.sleep(delay)
     return "未知"
 
-# 建立 Kali 黃金映像 Template VM
 def create_template(args, version):
     vm_id = TEMPLATE_ID
     working_dir = Path(args.workdir).resolve()
@@ -93,15 +82,11 @@ def create_template(args, version):
     iso_path = working_dir / filename
     version_file = working_dir / ".kali_version"
 
-    # 確保工作目錄存在
     working_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[INFO] 下載 Kali 映像：{kali_url}")
-    subprocess.run(
-        ["wget", "-c", "--retry-connrefused", "--tries=5", "--show-progress", kali_url],
-        check=True,
-        cwd=working_dir
-    )
+    subprocess.run(["wget", "-c", "--retry-connrefused", "--tries=5", "--show-progress", kali_url],
+                   check=True, cwd=working_dir)
 
     print("[INFO] 清空工作目錄中其他檔案 ...")
     for f in working_dir.glob("*"):
@@ -111,12 +96,10 @@ def create_template(args, version):
     print("[INFO] 解壓縮 Kali QEMU 映像 ...")
     subprocess.run(["unar", "-f", filename], check=True, cwd=working_dir)
 
-    # 取得解壓後映像檔
     qcow2file = next(working_dir.glob("*.qcow2"), None)
     if not qcow2file:
         raise RuntimeError("找不到解壓後的 qcow2 映像")
 
-    # 若舊黃金 VM 存在，刪除
     if Path(f"/etc/pve/qemu-server/{vm_id}.conf").exists():
         print(f"[INFO] 刪除舊的黃金映像 VM（ID {vm_id}）")
         subprocess.run(["qm", "destroy", str(vm_id)], check=True)
@@ -137,22 +120,19 @@ def create_template(args, version):
     subprocess.run(["qm", "set", str(vm_id), "--boot", "order=scsi0", "--bootdisk", "scsi0"], check=True)
     subprocess.run(["qm", "template", str(vm_id)], check=True)
 
-    # 儲存當前版本紀錄
     with version_file.open("w") as vf:
         vf.write(version)
 
     print(f"[OK] Template VM 已建立完成（ID: {vm_id}）")
 
-# 複製並建立使用者 VM
-def deploy_vm(args, vm_index=None):
+def deploy_vm(args, vm_name, index=None):
     vm_id = find_available_vm_id(100)
-    name = args.name if vm_index is None else f"{args.name}-{vm_index+1}"
-    desc = args.description if vm_index is None else f"{args.description} #{vm_index+1}"
+    desc = args.description if index is None else f"{args.description} #{index+1}"
     net = f"model=virtio,firewall=0,bridge={args.bridge}"
     if args.vlan:
         net += f",tag={args.vlan}"
 
-    subprocess.run(["qm", "clone", str(TEMPLATE_ID), str(vm_id), "--name", name], check=True)
+    subprocess.run(["qm", "clone", str(TEMPLATE_ID), str(vm_id), "--name", vm_name], check=True)
     subprocess.run(["qm", "set", str(vm_id),
                     "--memory", str(args.max_mem),
                     "--balloon", str(args.min_mem),
@@ -167,19 +147,17 @@ def deploy_vm(args, vm_index=None):
 
     return {
         "vm_id": vm_id,
-        "name": name,
+        "name": vm_name,
         "ip": ip,
         "cpu": args.cpu,
         "ram": f"{args.min_mem} ~ {args.max_mem} MB",
         "disk": convert_to_gb(disk)
     }
 
-# 主程式入口點
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="建立 Kali Template 並快速複製多台 VM")
     parser.add_argument("--count", type=int, default=1)
-    parser.add_argument("--workdir", default="/var/lib/vz/template/iso/kali-images")
-    parser.add_argument("--name", default="kali-vm")
+    parser.add_argument("--name", nargs='+', required=True, help="VM 名稱，支援單一名稱或多個名稱")
     parser.add_argument("--description", default="Kali VM auto-generated")
     parser.add_argument("--min-mem", type=int, default=4096)
     parser.add_argument("--max-mem", type=int, default=8192)
@@ -188,7 +166,15 @@ if __name__ == "__main__":
     parser.add_argument("--vlan", type=str)
     parser.add_argument("--resize", default="+20G")
     parser.add_argument("--storage", default="local-lvm")
+    parser.add_argument("--workdir", default="/var/lib/vz/template/iso/kali-images")
     args = parser.parse_args()
+
+    if len(args.name) == 1:
+        vm_names = [args.name[0]] + [f"{args.name[0]}-{i}" for i in range(1, args.count)]
+    elif len(args.name) == args.count:
+        vm_names = args.name
+    else:
+        raise ValueError(f"[ERROR] VM 名稱數量（{len(args.name)}）與 --count（{args.count}）不一致")
 
     ensure_installed("unar")
 
@@ -213,7 +199,7 @@ if __name__ == "__main__":
 
     all_vms = []
     for i in range(args.count):
-        all_vms.append(deploy_vm(args, i))
+        all_vms.append(deploy_vm(args, vm_names[i], i))
 
     print("\n=== 所有 Kali VM 建立完成 ===\n")
     for vm in all_vms:
