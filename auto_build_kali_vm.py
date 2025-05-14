@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# 自動化建立 Kali Linux VM 腳本，支援黃金映像模板建立與多台 VM 複製
+
 import os
 import re
 import subprocess
@@ -11,6 +14,7 @@ from pathlib import Path
 
 TEMPLATE_ID = 9000  # 固定的黃金映像 VM ID
 
+# 確保必要套件已安裝
 def ensure_installed(package_name):
     if shutil.which(package_name) is None:
         print(f"[INFO] 未安裝 {package_name}，正在安裝 ...")
@@ -19,6 +23,7 @@ def ensure_installed(package_name):
     else:
         print(f"[SKIP] 已安裝 {package_name}，跳過安裝")
 
+# 從 Kali 官方網站取得最新版本的 QEMU 映像資訊
 def get_latest_kali_url(base_url: str):
     response = requests.get(base_url)
     dirs = sorted(set(re.findall(r'kali-\d+\.\d+[a-z]?/', response.text)), reverse=True)
@@ -29,14 +34,17 @@ def get_latest_kali_url(base_url: str):
     filename = f"kali-linux-{version}-qemu-amd64.7z"
     return kali_dir, version, filename, f"{base_url}{kali_dir}/{filename}"
 
+# 檢查 VM ID 是否已經在使用中
 def id_in_use(vm_id: int) -> bool:
     return subprocess.run(["qm", "status", str(vm_id)], stdout=subprocess.DEVNULL).returncode == 0
 
+# 找出尚未使用的 VM ID
 def find_available_vm_id(start: int = 100):
     while id_in_use(start):
         start += 1
     return start
 
+# 從 qm config 解析磁碟容量大小
 def get_disk_size_gb(vm_id: int, storage: str) -> str:
     result = subprocess.run(["qm", "config", str(vm_id)], stdout=subprocess.PIPE, text=True)
     for line in result.stdout.splitlines():
@@ -46,6 +54,7 @@ def get_disk_size_gb(vm_id: int, storage: str) -> str:
                     return part.split("=")[1]
     return "未知"
 
+# 將容量格式轉換為 GiB 表示
 def convert_to_gb(size_str: str) -> str:
     if size_str.endswith("G"):
         return size_str
@@ -55,6 +64,7 @@ def convert_to_gb(size_str: str) -> str:
         return f"{float(size_str[:-1]) / (1024 * 1024):.2f}G"
     return size_str
 
+# 等待 guest agent 傳回 VM IP 地址（eth0 或常見名稱）
 def wait_for_ip(vm_id, retries=10, delay=3):
     for _ in range(retries):
         try:
@@ -75,6 +85,7 @@ def wait_for_ip(vm_id, retries=10, delay=3):
         time.sleep(delay)
     return "未知"
 
+# 建立 Kali 模板（黃金映像）
 def create_template(args, version):
     vm_id = TEMPLATE_ID
     working_dir = Path(args.workdir).resolve()
@@ -125,6 +136,7 @@ def create_template(args, version):
 
     print(f"[OK] Template VM 已建立完成（ID: {vm_id}）")
 
+# 複製 Template 建立新 VM 並設定參數
 def deploy_vm(args, vm_name, index=None):
     vm_id = find_available_vm_id(100)
     desc = args.description if index is None else f"{args.description} #{index+1}"
@@ -154,6 +166,7 @@ def deploy_vm(args, vm_name, index=None):
         "disk": convert_to_gb(disk)
     }
 
+# 主程式進入點
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="建立 Kali Template 並快速複製多台 VM")
     parser.add_argument("--count", type=int, default=1)
@@ -169,6 +182,7 @@ if __name__ == "__main__":
     parser.add_argument("--workdir", default="/var/lib/vz/template/iso/kali-images")
     args = parser.parse_args()
 
+    # 名稱規則處理：單一名稱時自動編號，多名稱時需與 count 相等
     if len(args.name) == 1:
         vm_names = [args.name[0]] + [f"{args.name[0]}-{i}" for i in range(1, args.count)]
     elif len(args.name) == args.count:
@@ -190,6 +204,7 @@ if __name__ == "__main__":
             if vf.read().strip() == version:
                 version_changed = False
 
+    # 若模板不存在或版本改變，則重新建立
     if not template_conf.exists() or not qcow2file or version_changed:
         print(f"[INFO] 偵測到以下情況需建立黃金映像：")
         if not template_conf.exists(): print("  - VM 9000 不存在")
