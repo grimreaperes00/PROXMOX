@@ -157,7 +157,7 @@ def deploy_vm(args, vm_name, index=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="建立 Kali Template 並快速複製多台 VM")
     parser.add_argument("--count", type=int, default=1)
-    parser.add_argument("--name", nargs='+', required=True, help="VM 名稱，支援單一名稱或多個名稱")
+    parser.add_argument("--name", nargs='+', default=["kali-vm"], help="VM 名稱，支援單一名稱或多個名稱")
     parser.add_argument("--description", default="Kali VM auto-generated")
     parser.add_argument("--min-mem", type=int, default=4096)
     parser.add_argument("--max-mem", type=int, default=8192)
