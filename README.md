@@ -8,18 +8,19 @@ apt install python3-pip -y
 
 - 參數資訊欄
 ```markdown
-| 參數名稱         | 預設值                                   | 資料型態 | 說明                               |
-| --------------- | ---------------------------------------- | ---- | -------------------------------- |
-| `--count`       | `1`                                      | int  | 要建立的 VM 數量                       |
-| `--name`        | `["kali-vm"]`                            | list | VM 名稱（可為一個，或依 `--count` 提供多個）    |
-| `--description` | `"Kali VM auto-generated"`               | str  | VM 描述資訊，會加上編號                    |
-| `--min-mem`     | `4096`                                   | int  | VM 最小可用記憶體（單位 MB，ballooning 設定用） |
-| `--max-mem`     | `8192`                                   | int  | VM 最大記憶體                         |
-| `--cpu`         | `4`                                      | int  | VM CPU 核心數                       |
-| `--bridge`      | `"vmbr0"`                                | str  | 網路橋接介面名稱（例如 vmbr0）               |
-| `--vlan`        | `None`                                   | str  | 指定 VLAN tag（可選）                  |
-| `--resize`      | `"+0G"`                                 | str  | 調整磁碟大小，會套用在 clone 出來的 VM 上       |
-| `--storage`     | `"local-lvm"`                            | str  | 磁碟存放位置（Proxmox 的 storage 名稱）     |
-| `--workdir`     | `"/var/lib/vz/template/iso/kali-images"` | str  | 映像與版本檢查所使用的工作資料夾                 |
+| 參數名稱         | 預設值         | 說明                                                                 |
+|------------------|---------------|----------------------------------------------------------------------|
+| `--count`        | `1`           | 要建立的 VM 數量，必須大於等於 1。                                   |
+| `--name`         | `["kali-vm"]` | VM 名稱，支援單一名稱或多個名稱。                                    |
+| `--description`  | `"Kali VM auto-generated"` | VM 的描述文字。                                                   |
+| `--min-mem`      | `4096`        | VM 的最小記憶體大小（MB），必須大於等於 512 且小於等於 `--max-mem`。 |
+| `--max-mem`      | `8192`        | VM 的最大記憶體大小（MB），必須大於等於 `--min-mem`。               |
+| `--cpu`          | `4`           | VM 的 CPU 核心數量，必須大於等於 1。                                 |
+| `--bridge`       | `"vmbr0"`     | VM 的網路橋接名稱。                                                 |
+| `--vlan`         | 無            | VLAN 標籤，必須是數字（可選）。                                      |
+| `--resize`       | `"+0G"`       | 磁碟大小調整值，例如 `+10G` 或 `+0G` 表示不變更，格式必須正確。      |
+| `--storage`      | `"local-lvm"` | VM 的存儲位置。                                                     |
+| `--workdir`      | `"/var/lib/vz/template/iso/kali-images"` | 工作目錄，用於存放下載的映像檔案。 |
+
 ```
 
