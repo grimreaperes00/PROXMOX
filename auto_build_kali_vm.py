@@ -36,7 +36,14 @@ def get_latest_kali_url(base_url: str):
 
 # 檢查 VM ID 是否已經在使用中
 def id_in_use(vm_id: int) -> bool:
-    return subprocess.run(["qm", "status", str(vm_id)], stdout=subprocess.DEVNULL).returncode == 0
+    vm_conf = Path(f"/etc/pve/qemu-server/{vm_id}.conf")
+    ct_conf = Path(f"/etc/pve/lxc/{vm_id}.conf")
+    return (
+        subprocess.run(["qm", "status", str(vm_id)], stdout=subprocess.DEVNULL).returncode == 0 or
+        subprocess.run(["pct", "status", str(vm_id)], stdout=subprocess.DEVNULL).returncode == 0 or
+        vm_conf.exists() or
+        ct_conf.exists()
+    )
 
 # 找出尚未使用的 VM ID
 def find_available_vm_id(start: int = 100):
@@ -65,7 +72,7 @@ def convert_to_gb(size_str: str) -> str:
     return size_str
 
 # 等待 guest agent 傳回 VM IP 地址（eth0 或常見名稱）
-def wait_for_ip(vm_id, retries=10, delay=3):
+def wait_for_ip(vm_id, retries=50, delay=1):
     for _ in range(retries):
         try:
             result = subprocess.run(
@@ -95,21 +102,26 @@ def create_template(args, version):
 
     working_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"[INFO] 下載 Kali 映像：{kali_url}")
-    subprocess.run(["wget", "-c", "--retry-connrefused", "--tries=5", "--show-progress", kali_url],
-                   check=True, cwd=working_dir)
-
-    print("[INFO] 清空工作目錄中其他檔案 ...")
-    for f in working_dir.glob("*"):
-        if f.name != filename:
-            f.unlink()
-
-    print("[INFO] 解壓縮 Kali QEMU 映像 ...")
-    subprocess.run(["unar", "-f", filename], check=True, cwd=working_dir)
-
+    # 檢查是否已存在 qcow2 檔案
     qcow2file = next(working_dir.glob("*.qcow2"), None)
-    if not qcow2file:
-        raise RuntimeError("找不到解壓後的 qcow2 映像")
+    if qcow2file:
+        print(f"[INFO] 發現現有的 qcow2 檔案：{qcow2file}，跳過下載與解壓縮")
+    else:
+        print(f"[INFO] 下載 Kali 映像：{kali_url}")
+        subprocess.run(["wget", "-c", "--retry-connrefused", "--tries=5", "--show-progress", kali_url],
+                       check=True, cwd=working_dir)
+
+        print("[INFO] 清空工作目錄中其他檔案 ...")
+        for f in working_dir.glob("*"):
+            if f.name != filename:
+                f.unlink()
+
+        print("[INFO] 解壓縮 Kali QEMU 映像 ...")
+        subprocess.run(["unar", "-f", filename], check=True, cwd=working_dir)
+
+        qcow2file = next(working_dir.glob("*.qcow2"), None)
+        if not qcow2file:
+            raise RuntimeError("找不到解壓後的 qcow2 映像")
 
     if Path(f"/etc/pve/qemu-server/{vm_id}.conf").exists():
         print(f"[INFO] 刪除舊的黃金映像 VM（ID {vm_id}）")
@@ -154,7 +166,7 @@ def deploy_vm(args, vm_name, index=None):
                     "--description", desc,
                     "--agent", "enabled=1"], check=True)
     subprocess.run(["qm", "start", str(vm_id)], check=True)
-
+    time.sleep(15)  # 等待 15 秒，確保 Guest Agent 啟動
     ip = wait_for_ip(vm_id)
     disk = get_disk_size_gb(vm_id, args.storage)
 
@@ -182,6 +194,18 @@ if __name__ == "__main__":
     parser.add_argument("--storage", default="local-lvm")
     parser.add_argument("--workdir", default="/var/lib/vz/template/iso/kali-images")
     args = parser.parse_args()
+
+    # 驗證輸入參數
+    if args.count < 1:
+        raise ValueError("[ERROR] --count 必須大於等於 1")
+    if args.min_mem < 512 or args.max_mem < args.min_mem:
+        raise ValueError("[ERROR] 記憶體配置無效，請檢查 --min-mem 與 --max-mem")
+    if args.cpu < 1:
+        raise ValueError("[ERROR] --cpu 必須大於等於 1")
+    if args.resize and not re.match(r"^[+-]?\d+[GMK]$", args.resize):
+        raise ValueError("[ERROR] --resize 格式無效，請使用類似 +10G 的格式")
+    if args.vlan and not args.vlan.isdigit():
+        raise ValueError("[ERROR] --vlan 必須是數字")
 
     # 名稱規則處理：單一名稱時自動編號，多名稱時需與 count 相等
     if len(args.name) == 1:
