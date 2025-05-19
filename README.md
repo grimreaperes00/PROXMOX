@@ -40,3 +40,7 @@ Choose 1-2 [1]:
 ```
 0 1 * * * /usr/bin/python3 /root/setup_dependencies.py >> /var/log/daily_maintenance_cron.log 2>&1
 ```
+- 如想重選編輯器
+```
+select-editor
+```
