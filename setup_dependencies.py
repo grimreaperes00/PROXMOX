@@ -33,19 +33,18 @@ def ensure_pip_package(pkg_name):
         __import__(pkg_name)
         log(f"[OK] Python 模組 {pkg_name} 已存在")
     except ImportError:
-        log(f"[INFO] 安裝 Python 模組: {pkg_name}")
+        log(f"[INFO] 尚未安裝 Python 模組: {pkg_name}，執行安裝...")
         subprocess.run([sys.executable, "-m", "pip", "install", pkg_name], check=True, stdout=log_file, stderr=log_file)
 
 def upgrade_python_packages():
     log("📦 升級 pip 與核心 Python 套件 ...")
     subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "pip"], check=True, stdout=log_file, stderr=log_file)
     packages = [
-        "openai", "proxmoxer", "requests", "urllib3", "idna", "certifi",
-        "setuptools", "wheel"
+        "requests", "urllib3", "idna", "certifi", "setuptools", "wheel"
     ]
     for pkg in packages:
         subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", pkg], check=True, stdout=log_file, stderr=log_file)
-    log("✅ Python 套件升級完成")
+    log("✅ Python 核心套件升級完成")
 
 if __name__ == "__main__":
     log_dir = Path("/root/update_log")
