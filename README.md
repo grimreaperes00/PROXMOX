@@ -23,4 +23,4 @@ apt install python3-pip -y
 | `--workdir`      | `"/var/lib/vz/template/iso/kali-images"` | 工作目錄，用於存放下載的映像檔案。 |
 
 ```
-
+- setup_dependencies.py 自動化更新，並安裝特定套件
