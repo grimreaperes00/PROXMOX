@@ -1,11 +1,9 @@
 ## test_kali.sh 最基礎可作用新增KALI VM無任何參數定義
-
 ## 請先下載PYTHON套件
 ```
 apt install python3-pip -y
 ```
 ## build_kali_vm_auto_template.py 當前最新KALI VM版本(參數如下)
-
 - 參數資訊欄
 ```markdown
 | 參數名稱         | 預設值         | 說明                                                                 |
