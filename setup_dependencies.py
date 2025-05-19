@@ -34,22 +34,35 @@ def ensure_pip_package(pkg_name):
         log(f"[OK] Python 模組 {pkg_name} 已存在")
     except ImportError:
         log(f"[INFO] 尚未安裝 Python 模組: {pkg_name}，執行安裝...")
-        subprocess.run([sys.executable, "-m", "pip", "install", pkg_name], check=True, stdout=log_file, stderr=log_file)
+        try:
+            subprocess.run([
+                sys.executable, "-m", "pip", "install", "--no-cache-dir",
+                "--break-system-packages", pkg_name
+            ], check=True, stdout=log_file, stderr=log_file)
+            log(f"[OK] 成功安裝 Python 模組: {pkg_name}")
+        except subprocess.CalledProcessError:
+            log(f"[ERROR] 模組 {pkg_name} 安裝失敗，請手動檢查")
 
 def upgrade_python_packages():
     log("📦 升級 pip 與核心 Python 套件 ...")
-    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "pip"], check=True, stdout=log_file, stderr=log_file)
-    packages = [
-        "requests", "urllib3", "idna", "certifi", "setuptools", "wheel"
-    ]
+    try:
+        subprocess.run([
+            sys.executable, "-m", "pip", "install", "--upgrade", "pip",
+            "--no-cache-dir", "--break-system-packages"
+        ], check=True, stdout=log_file, stderr=log_file)
+    except subprocess.CalledProcessError:
+        log("[ERROR] pip 升級失敗，跳過此步驟")
+
+    packages = ["requests", "urllib3", "idna", "certifi", "setuptools", "wheel"]
     for pkg in packages:
-        subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", pkg], check=True, stdout=log_file, stderr=log_file)
-    log("✅ Python 核心套件升級完成")
-    # 額外記錄已安裝版本
-    log("🔍 當前 Python 模組版本：")
-    result = subprocess.run([sys.executable, "-m", "pip", "list"], stdout=subprocess.PIPE, text=True)
-    with open(LOG_FILE, "a") as f:
-        f.write(result.stdout)
+        try:
+            subprocess.run([
+                sys.executable, "-m", "pip", "install", "--upgrade", pkg,
+                "--no-cache-dir", "--break-system-packages"
+            ], check=True, stdout=log_file, stderr=log_file)
+        except subprocess.CalledProcessError:
+            log(f"[ERROR] 套件 {pkg} 升級失敗，繼續下一項")
+    log("✅ Python 核心套件升級流程完成")
 
 if __name__ == "__main__":
     log_dir = Path("/root/update_log")
