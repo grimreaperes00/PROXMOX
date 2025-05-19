@@ -24,3 +24,19 @@ apt install python3-pip -y
 
 ```
 - setup_dependencies.py 自動化更新，並安裝特定套件
+- 系統自動化執行
+```
+crontab -e
+```
+- 如顯示以下，本人用nano所以輸入1
+```
+Select an editor.  To change later, run 'select-editor'.
+  1. /bin/nano        <---- easiest
+  2. /usr/bin/vim.tiny
+
+Choose 1-2 [1]: 
+```
+- 並於文件最後添加
+```
+0 1 * * * /usr/bin/python3 /root/setup_dependencies.py >> /var/log/daily_maintenance_cron.log 2>&1
+```
