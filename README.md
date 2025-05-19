@@ -28,7 +28,7 @@ apt install python3-pip -y
 ```
 crontab -e
 ```
-- 如顯示以下，本人用nano所以輸入1
+- 如顯示以下，本人用nano，所以輸入1
 ```
 Select an editor.  To change later, run 'select-editor'.
   1. /bin/nano        <---- easiest
