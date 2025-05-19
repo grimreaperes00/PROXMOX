@@ -45,6 +45,11 @@ def upgrade_python_packages():
     for pkg in packages:
         subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", pkg], check=True, stdout=log_file, stderr=log_file)
     log("✅ Python 核心套件升級完成")
+    # 額外記錄已安裝版本
+    log("🔍 當前 Python 模組版本：")
+    result = subprocess.run([sys.executable, "-m", "pip", "list"], stdout=subprocess.PIPE, text=True)
+    with open(LOG_FILE, "a") as f:
+        f.write(result.stdout)
 
 if __name__ == "__main__":
     log_dir = Path("/root/update_log")
