@@ -258,16 +258,6 @@ if __name__ == "__main__":
         sys.exit(1)
     ensure_unar_available()
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        key_file = Path("~/.openai_api_key").expanduser()
-        if key_file.exists():
-            with key_file.open() as f:
-                api_key = f.read().strip()
-        else:
-            raise RuntimeError("[ERROR] NLP 模式需設定 OPENAI_API_KEY 環境變數或 ~/.openai_api_key")
-    openai.api_key = api_key
-
     parser = argparse.ArgumentParser(description="建立 Kali Template 並快速複製多台 VM")
     parser.add_argument("--nlp", type=str, help="自然語言描述 VM 建立指令")
     parser.add_argument("--count", type=int, default=1)
@@ -284,6 +274,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.nlp:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            key_file = Path("~/.openai_api_key").expanduser()
+            if key_file.exists():
+                with key_file.open() as f:
+                    api_key = f.read().strip()
+            else:
+                raise RuntimeError("[ERROR] NLP 模式需設定 OPENAI_API_KEY 環境變數或 ~/.openai_api_key")
+        openai.api_key = api_key
+
         parsed_args = parse_nlp_to_args(args.nlp)
         args.count = parsed_args.get("count", 1)
         args.name = parsed_args.get("name", ["kali-nlp"])
