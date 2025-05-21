@@ -42,4 +42,4 @@ Choose 1-2 [1]:
 ```
 select-editor
 ```
-## test_kali.py API(功能未測
+## test_kali.py (API功能未測，主功能大致正常
